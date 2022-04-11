@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/sigstore/rekor/pkg/generated/models"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/chains/signing"
 	"github.com/tektoncd/chains/pkg/chains/storage"
 	"github.com/tektoncd/chains/pkg/config"
@@ -47,12 +48,13 @@ func TestMarkSigned(t *testing.T) {
 			},
 		},
 	}
+	trObj := objects.NewTaskRunObject(tr, c, ctx)
 	if _, err := c.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	// Now mark it as signed.
-	if err := MarkSigned(ctx, tr, c, nil); err != nil {
+	if err := MarkSigned(ctx, trObj, c, nil); err != nil {
 		t.Errorf("MarkSigned() error = %v", err)
 	}
 
@@ -71,7 +73,8 @@ func TestMarkSigned(t *testing.T) {
 	extra := map[string]string{
 		"foo": "bar",
 	}
-	if err := MarkSigned(ctx, tr, c, extra); err != nil {
+
+	if err := MarkSigned(ctx, trObj, c, extra); err != nil {
 		t.Errorf("MarkSigned() error = %v", err)
 	}
 
@@ -108,7 +111,8 @@ func TestMarkFailed(t *testing.T) {
 	}
 
 	// Test HandleRetry, should mark it as failed
-	if err := HandleRetry(ctx, tr, c, nil); err != nil {
+	trObj := objects.NewTaskRunObject(tr, c, ctx)
+	if err := HandleRetry(ctx, trObj, c, nil); err != nil {
 		t.Errorf("HandleRetry() error = %v", err)
 	}
 
@@ -122,8 +126,8 @@ func TestMarkFailed(t *testing.T) {
 	}
 }
 
-func TestTaskRunSigner_SignTaskRun(t *testing.T) {
-	// SignTaskRun does three main things:
+func TestTaskRunSigner_Sign(t *testing.T) {
+	// Sign does three main things:
 	// - generates payloads
 	// - stores them in the configured systems
 	// - marks the taskrun as signed
@@ -189,8 +193,8 @@ func TestTaskRunSigner_SignTaskRun(t *testing.T) {
 			if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr, metav1.CreateOptions{}); err != nil {
 				t.Errorf("error creating fake taskrun: %v", err)
 			}
-			if err := ts.SignTaskRun(ctx, tr); (err != nil) != tt.wantErr {
-				t.Errorf("TaskRunSigner.SignTaskRun() error = %v", err)
+			if err := ts.Sign(ctx, tr); (err != nil) != tt.wantErr {
+				t.Errorf("TaskRunSigner.Sign() error = %v", err)
 			}
 
 			// Fetch a new TR!
@@ -259,8 +263,8 @@ func TestTaskRunSigner_Transparency(t *testing.T) {
 		if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr, metav1.CreateOptions{}); err != nil {
 			t.Errorf("error creating fake taskrun: %v", err)
 		}
-		if err := ts.SignTaskRun(ctx, tr); err != nil {
-			t.Errorf("TaskRunSigner.SignTaskRun() error = %v", err)
+		if err := ts.Sign(ctx, tr); err != nil {
+			t.Errorf("TaskRunSigner.Sign() error = %v", err)
 		}
 
 		if len(rekor.entries) != 0 {
@@ -279,8 +283,8 @@ func TestTaskRunSigner_Transparency(t *testing.T) {
 		if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr2, metav1.CreateOptions{}); err != nil {
 			t.Errorf("error creating fake taskrun: %v", err)
 		}
-		if err := ts.SignTaskRun(ctx, tr2); err != nil {
-			t.Errorf("TaskRunSigner.SignTaskRun() error = %v", err)
+		if err := ts.Sign(ctx, tr2); err != nil {
+			t.Errorf("TaskRunSigner.Sign() error = %v", err)
 		}
 
 		if len(rekor.entries) != 1 {
@@ -300,8 +304,8 @@ func TestTaskRunSigner_Transparency(t *testing.T) {
 		if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr3, metav1.CreateOptions{}); err != nil {
 			t.Errorf("error creating fake taskrun: %v", err)
 		}
-		if err := ts.SignTaskRun(ctx, tr3); err != nil {
-			t.Errorf("TaskRunSigner.SignTaskRun() error = %v", err)
+		if err := ts.Sign(ctx, tr3); err != nil {
+			t.Errorf("TaskRunSigner.Sign() error = %v", err)
 		}
 
 		if len(rekor.entries) != 1 {
@@ -309,8 +313,8 @@ func TestTaskRunSigner_Transparency(t *testing.T) {
 		}
 		// add in the annotation
 		tr3.Annotations = map[string]string{RekorAnnotation: "true"}
-		if err := ts.SignTaskRun(ctx, tr3); err != nil {
-			t.Errorf("TaskRunSigner.SignTaskRun() error = %v", err)
+		if err := ts.Sign(ctx, tr3); err != nil {
+			t.Errorf("TaskRunSigner.Sign() error = %v", err)
 		}
 
 		if len(rekor.entries) != 2 {
@@ -321,7 +325,7 @@ func TestTaskRunSigner_Transparency(t *testing.T) {
 
 func setupMocks(backends []*mockBackend, rekor *mockRekor) func() {
 	oldGet := getBackends
-	getBackends = func(ctx context.Context, ps versioned.Interface, _ kubernetes.Interface, logger *zap.SugaredLogger, _ *v1beta1.TaskRun, _ config.Config) (map[string]storage.Backend, error) {
+	getBackends = func(ctx context.Context, ps versioned.Interface, _ kubernetes.Interface, logger *zap.SugaredLogger, _ objects.K8sObject, _ config.Config) (map[string]storage.Backend, error) {
 		newBackends := map[string]storage.Backend{}
 		for _, m := range backends {
 			newBackends[m.backendType] = m

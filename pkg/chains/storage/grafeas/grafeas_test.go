@@ -155,7 +155,7 @@ func TestBackend_StorePayload(t *testing.T) {
 				signature: "oci signature",
 				// The Key field must be the same as the first 12 chars of the image digest.
 				// Reason:
-				// Inside chains.SignTaskRun function, we set the key field for both artifacts.
+				// Inside chains.Sign function, we set the key field for both artifacts.
 				// For OCI artifact, it is implemented as the first 12 chars of the image digest.
 				// https://github.com/tektoncd/chains/blob/v0.8.0/pkg/artifacts/signable.go#L200
 				opts: config.StorageOpts{Key: "cfe4f0bf41c8", PayloadFormat: formats.PayloadTypeSimpleSigning},
