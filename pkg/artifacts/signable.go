@@ -28,12 +28,7 @@ import (
 )
 
 type Signable interface {
-	// TODO: We may want to consider refactoring ExtractObjects to take interface{}, or
-	// some generic k8s type that contians the metadata attribute, for example. It does
-	// not make sense for the TaskRunArtifact to implement ExtractObjectsFromPipelineRun
-	// just to comply with this interface.
-	ExtractObjects(tr *v1beta1.TaskRun) []interface{}
-	ExtractObjectsFromPipelineRun(tr *v1beta1.PipelineRun) []interface{}
+	ExtractObjects(obj interface{}) []interface{}
 	StorageBackend(cfg config.Config) sets.String
 	Signer(cfg config.Config) string
 	PayloadFormat(cfg config.Config) formats.PayloadType
@@ -51,12 +46,9 @@ func (ta *TaskRunArtifact) Key(obj interface{}) string {
 	return "taskrun-" + string(tr.UID)
 }
 
-func (ta *TaskRunArtifact) ExtractObjects(tr *v1beta1.TaskRun) []interface{} {
+func (ta *TaskRunArtifact) ExtractObjects(obj interface{}) []interface{} {
+	tr := obj.(*v1beta1.TaskRun)
 	return []interface{}{tr}
-}
-
-func (ta *TaskRunArtifact) ExtractObjectsFromPipelineRun(pr *v1beta1.PipelineRun) []interface{} {
-	return make([]interface{}, 0)
 }
 
 func (ta *TaskRunArtifact) Type() string {
@@ -88,11 +80,8 @@ func (pa *PipelineRunArtifact) Key(obj interface{}) string {
 	return "pipelinerun-" + string(pr.UID)
 }
 
-func (pa *PipelineRunArtifact) ExtractObjects(tr *v1beta1.TaskRun) []interface{} {
-	return make([]interface{}, 0)
-}
-
-func (pa *PipelineRunArtifact) ExtractObjectsFromPipelineRun(pr *v1beta1.PipelineRun) []interface{} {
+func (pa *PipelineRunArtifact) ExtractObjects(obj interface{}) []interface{} {
+	pr := obj.(*v1beta1.PipelineRun)
 	return []interface{}{pr}
 }
 
@@ -126,15 +115,13 @@ type image struct {
 	digest string
 }
 
-// StructuredSignable contains info for signable targets to become either subjects or materials in intoto Statements.
-// URI is the resource uri for the target needed iff the target is a material.
-// Digest is the target's SHA digest.
 type StructuredSignable struct {
 	URI    string
 	Digest string
 }
 
-func (oa *OCIArtifact) ExtractObjects(tr *v1beta1.TaskRun) []interface{} {
+func (oa *OCIArtifact) ExtractObjects(obj interface{}) []interface{} {
+	tr := obj.(*v1beta1.TaskRun)
 	imageResourceNames := map[string]*image{}
 	if tr.Status.TaskSpec != nil && tr.Status.TaskSpec.Resources != nil {
 		for _, output := range tr.Status.TaskSpec.Resources.Outputs {
@@ -172,10 +159,6 @@ func (oa *OCIArtifact) ExtractObjects(tr *v1beta1.TaskRun) []interface{} {
 	objs = append(objs, resultImages...)
 
 	return objs
-}
-
-func (oa *OCIArtifact) ExtractObjectsFromPipelineRun(pr *v1beta1.PipelineRun) []interface{} {
-	return make([]interface{}, 0)
 }
 
 func ExtractOCIImagesFromResults(tr *v1beta1.TaskRun, logger *zap.SugaredLogger) []interface{} {
