@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/tektoncd/chains/pkg/artifacts"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
@@ -48,7 +49,8 @@ func (tv *TaskRunVerifier) VerifyTaskRun(ctx context.Context, tr *v1beta1.TaskRu
 	}
 
 	// Storage
-	allBackends, err := getBackends(ctx, tv.Pipelineclientset, tv.KubeClient, logger, tr, cfg)
+	obj := objects.NewTaskRunObject(tr, tv.Pipelineclientset, ctx)
+	allBackends, err := getBackends(ctx, tv.Pipelineclientset, tv.KubeClient, logger, obj, cfg)
 	if err != nil {
 		return err
 	}

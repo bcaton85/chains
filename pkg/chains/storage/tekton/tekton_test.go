@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
@@ -64,9 +65,8 @@ func TestBackend_StorePayload(t *testing.T) {
 			}
 
 			b := &Backend{
-				pipelienclientset: c,
-				logger:            logtesting.TestLogger(t),
-				tr:                tr,
+				logger: logtesting.TestLogger(t),
+				obj:    objects.NewTaskRunObject(tr, c, ctx),
 			}
 			payload, err := json.Marshal(tt.payload)
 			if err != nil {

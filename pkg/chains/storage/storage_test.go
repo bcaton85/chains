@@ -17,8 +17,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	fakepipelineclientset "github.com/tektoncd/pipeline/pkg/client/clientset/versioned/fake"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fakekubeclient "knative.dev/pkg/client/injection/kube/client/fake"
@@ -51,7 +53,11 @@ func TestInitializeBackends(t *testing.T) {
 	tr := &v1beta1.TaskRun{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := InitializeBackends(ctx, ps, kc, logger, tr, tt.cfg)
+			ctx, _ := rtesting.SetupFakeContext(t)
+
+			c := fakepipelineclientset.NewSimpleClientset()
+			trObj := objects.NewTaskRunObject(tr, c, ctx)
+			got, err := InitializeBackends(ctx, ps, kc, logger, trObj, tt.cfg)
 			if err != nil {
 				t.Errorf("InitializeBackends() error = %v", err)
 				return
