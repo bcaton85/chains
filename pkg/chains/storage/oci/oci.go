@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -37,7 +38,6 @@ import (
 	"github.com/tektoncd/chains/pkg/artifacts"
 	"github.com/tektoncd/chains/pkg/chains/formats/simple"
 	"github.com/tektoncd/chains/pkg/config"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes"
 )
@@ -48,23 +48,23 @@ const (
 
 type Backend struct {
 	logger *zap.SugaredLogger
-	tr     *v1beta1.TaskRun
+	obj    objects.K8sObject
 	cfg    config.Config
 	kc     authn.Keychain
 	auth   remote.Option
 }
 
 // NewStorageBackend returns a new OCI StorageBackend that stores signatures in an OCI registry
-func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, client kubernetes.Interface, tr *v1beta1.TaskRun, cfg config.Config) (*Backend, error) {
+func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, client kubernetes.Interface, obj objects.K8sObject, cfg config.Config) (*Backend, error) {
 	kc, err := k8schain.New(ctx, client,
-		k8schain.Options{Namespace: tr.Namespace, ServiceAccountName: tr.Spec.ServiceAccountName})
+		k8schain.Options{Namespace: obj.GetNamespace(), ServiceAccountName: obj.GetServiceAccountName()})
 	if err != nil {
 		return nil, err
 	}
 
 	return &Backend{
 		logger: logger,
-		tr:     tr,
+		obj:    obj,
 		cfg:    cfg,
 		kc:     kc,
 		auth:   remote.WithAuthFromKeychain(kc),
@@ -73,7 +73,7 @@ func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, client ku
 
 // StorePayload implements the storage.Backend interface.
 func (b *Backend) StorePayload(ctx context.Context, rawPayload []byte, signature string, storageOpts config.StorageOpts) error {
-	b.logger.Infof("Storing payload on TaskRun %s/%s", b.tr.Namespace, b.tr.Name)
+	b.logger.Infof("Storing payload on %s/%s/%s", b.obj.GetKind(), b.obj.GetNamespace(), b.obj.GetName())
 
 	if storageOpts.PayloadFormat == formats.PayloadTypeSimpleSigning {
 		format := simple.SimpleContainerImage{}
@@ -94,8 +94,8 @@ func (b *Backend) StorePayload(ctx context.Context, rawPayload []byte, signature
 		// that is not intended to produce an image, e.g. git-clone.
 		if len(attestation.Subject) == 0 {
 			b.logger.Infof(
-				"No image subject to attest for TaskRun %s/%s. Skipping upload to registry",
-				b.tr.Namespace, b.tr.Name)
+				"No image subject to attest for %s/%s/%s. Skipping upload to registry",
+				b.obj.GetKind(), b.obj.GetNamespace(), b.obj.GetName())
 			return nil
 		}
 
@@ -276,7 +276,7 @@ func (b *Backend) RetrievePayloads(ctx context.Context, opts config.StorageOpts)
 
 func (b *Backend) RetrieveArtifact(ctx context.Context, opts config.StorageOpts) (map[string]oci.SignedImage, error) {
 	// Given the TaskRun, retrieve the OCI images.
-	images := artifacts.ExtractOCIImagesFromResults(b.tr, b.logger)
+	images := artifacts.ExtractOCIImagesFromResults(b.obj, b.logger)
 	m := make(map[string]oci.SignedImage)
 
 	for _, image := range images {

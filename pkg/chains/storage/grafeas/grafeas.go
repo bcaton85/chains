@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tektoncd/chains/pkg/artifacts"
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
@@ -368,7 +369,8 @@ func (b *Backend) getOCIURI(opts config.StorageOpts) string {
 // get the uri of all images for a specific taskrun in the format of `IMAGE_URL@IMAGE_DIGEST`
 func (b *Backend) retrieveAllOCIURIs() []string {
 	result := []string{}
-	images := artifacts.ExtractOCIImagesFromResults(b.tr, b.logger)
+	trObj := objects.NewTaskRunObject(b.tr, nil, nil)
+	images := artifacts.ExtractOCIImagesFromResults(trObj, b.logger)
 
 	for _, image := range images {
 		ref := image.(name.Digest)

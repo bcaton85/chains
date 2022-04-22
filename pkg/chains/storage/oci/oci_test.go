@@ -32,6 +32,7 @@ import (
 	"github.com/in-toto/in-toto-golang/in_toto"
 	slsa "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
 	"github.com/sigstore/sigstore/pkg/signature/payload"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	remotetest "github.com/tektoncd/pipeline/test"
 	corev1 "k8s.io/api/core/v1"
@@ -181,9 +182,15 @@ func TestBackend_StorePayload(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Trying to create context fails with "Unable to fetch labelkey from context."
+			// We don't need the context or client so we'll just pass nil for now
+			// ctx, _ := rtesting.SetupFakeContext(t)
+			// c := fakepipelineclient.Get(ctx)
+			// obj := objects.NewTaskRunObject(tt.fields.tr, c, ctx)
+			obj := objects.NewTaskRunObject(tt.fields.tr, nil, nil)
 			b := &Backend{
 				logger: logtesting.TestLogger(t),
-				tr:     tt.fields.tr,
+				obj:    obj,
 				cfg:    tt.fields.cfg,
 				kc:     tt.fields.kc,
 				auth:   tt.fields.auth,

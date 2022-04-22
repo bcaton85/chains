@@ -72,12 +72,7 @@ func InitializeBackends(ctx context.Context, ps versioned.Interface, kc kubernet
 		case tekton.StorageBackendTekton:
 			backends[backendType] = tekton.NewStorageBackend(logger, obj)
 		case oci.StorageBackendOCI:
-			tr, ok := obj.GetObject().(*v1beta1.TaskRun)
-			if !ok {
-				logger.Error("PipelineRun does not currently support OCI backend")
-				continue
-			}
-			ociBackend, err := oci.NewStorageBackend(ctx, logger, kc, tr, cfg)
+			ociBackend, err := oci.NewStorageBackend(ctx, logger, kc, obj, cfg)
 			if err != nil {
 				return nil, err
 			}
