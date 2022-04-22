@@ -115,6 +115,9 @@ type image struct {
 	digest string
 }
 
+// StructuredSignable contains info for signable targets to become either subjects or materials in intoto Statements.
+// URI is the resource uri for the target needed iff the target is a material.
+// Digest is the target's SHA digest.
 type StructuredSignable struct {
 	URI    string
 	Digest string
