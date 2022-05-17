@@ -255,7 +255,7 @@ status:
 		},
 	}
 
-	got := invocation(taskRun)
+	got := invocation(taskRun, logtesting.TestLogger(t))
 	if !reflect.DeepEqual(expected, got) {
 		if d := cmp.Diff(expected, got); d != "" {
 			t.Log(d)
