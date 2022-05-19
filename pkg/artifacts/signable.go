@@ -21,6 +21,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/opencontainers/go-digest"
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
@@ -28,7 +29,7 @@ import (
 )
 
 type Signable interface {
-	ExtractObjects(obj interface{}) []interface{}
+	ExtractObjects(obj objects.TektonObject) []interface{}
 	StorageBackend(cfg config.Config) sets.String
 	Signer(cfg config.Config) string
 	PayloadFormat(cfg config.Config) formats.PayloadType
@@ -46,8 +47,8 @@ func (ta *TaskRunArtifact) Key(obj interface{}) string {
 	return "taskrun-" + string(tr.UID)
 }
 
-func (ta *TaskRunArtifact) ExtractObjects(obj interface{}) []interface{} {
-	tr := obj.(*v1beta1.TaskRun)
+func (ta *TaskRunArtifact) ExtractObjects(obj objects.TektonObject) []interface{} {
+	tr := obj.GetObject().(*v1beta1.TaskRun)
 	return []interface{}{tr}
 }
 
@@ -80,8 +81,8 @@ func (pa *PipelineRunArtifact) Key(obj interface{}) string {
 	return "pipelinerun-" + string(pr.UID)
 }
 
-func (pa *PipelineRunArtifact) ExtractObjects(obj interface{}) []interface{} {
-	pr := obj.(*v1beta1.PipelineRun)
+func (pa *PipelineRunArtifact) ExtractObjects(obj objects.TektonObject) []interface{} {
+	pr := obj.GetObject().(*v1beta1.PipelineRun)
 	return []interface{}{pr}
 }
 
@@ -123,8 +124,8 @@ type StructuredSignable struct {
 	Digest string
 }
 
-func (oa *OCIArtifact) ExtractObjects(obj interface{}) []interface{} {
-	tr := obj.(*v1beta1.TaskRun)
+func (oa *OCIArtifact) ExtractObjects(obj objects.TektonObject) []interface{} {
+	tr := obj.GetObject().(*v1beta1.TaskRun)
 	imageResourceNames := map[string]*image{}
 	if tr.Status.TaskSpec != nil && tr.Status.TaskSpec.Resources != nil {
 		for _, output := range tr.Status.TaskSpec.Resources.Outputs {
