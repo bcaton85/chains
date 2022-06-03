@@ -51,6 +51,12 @@ var (
 			Namespace: namespace,
 		},
 	}
+	pr = &v1beta1.PipelineRun{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: namespace,
+		},
+	}
 )
 
 func TestBackend_StorePayload(t *testing.T) {
@@ -99,7 +105,7 @@ func TestBackend_StorePayload(t *testing.T) {
 	}
 
 	type fields struct {
-		tr *v1beta1.TaskRun
+		object objects.TektonObject
 	}
 	type args struct {
 		payload     interface{}
@@ -115,7 +121,7 @@ func TestBackend_StorePayload(t *testing.T) {
 		{
 			name: "simplesigning payload",
 			fields: fields{
-				tr: tr,
+				object: objects.NewTaskRunObject(tr),
 			},
 			args: args{
 				payload:   simple,
@@ -129,7 +135,49 @@ func TestBackend_StorePayload(t *testing.T) {
 		{
 			name: "into-to payload",
 			fields: fields{
-				tr: tr,
+				object: objects.NewTaskRunObject(tr),
+			},
+			args: args{
+				payload:   intotoStatement,
+				signature: "into-to",
+				storageOpts: config.StorageOpts{
+					PayloadFormat: "in-toto",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "no subject",
+			fields: fields{
+				object: objects.NewTaskRunObject(tr),
+			},
+			args: args{
+				payload:   in_toto.Statement{},
+				signature: "",
+				storageOpts: config.StorageOpts{
+					PayloadFormat: "in-toto",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "simplesigning payload",
+			fields: fields{
+				object: objects.NewPipelineRunObject(pr),
+			},
+			args: args{
+				payload:   simple,
+				signature: "simplesigning",
+				storageOpts: config.StorageOpts{
+					PayloadFormat: formats.PayloadTypeSimpleSigning,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "into-to payload",
+			fields: fields{
+				object: objects.NewPipelineRunObject(pr),
 			},
 			args: args{
 				payload:   intotoStatement,
@@ -171,7 +219,7 @@ func TestBackend_StorePayload(t *testing.T) {
 		{
 			name: "no subject",
 			fields: fields{
-				tr: tr,
+				object: objects.NewPipelineRunObject(pr),
 			},
 			args: args{
 				payload:   in_toto.Statement{},
@@ -186,7 +234,6 @@ func TestBackend_StorePayload(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			trObj := objects.NewTaskRunObject(tt.fields.tr)
 			b := &Backend{
 				logger: logtesting.TestLogger(t),
 				getAuthenticator: func(_ context.Context, _ objects.TektonObject, _ kubernetes.Interface) (remote.Option, error) {
@@ -201,7 +248,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			// need to diagnose why. Client isn't used so we can get away with passing nil for now.
 			// 	ctx, _ := rtesting.SetupFakeContext(t)
 			// c := fakepipelineclient.Get(ctx)
-			if err := b.StorePayload(ctx, nil, trObj, rawPayload, tt.args.signature, tt.args.storageOpts); (err != nil) != tt.wantErr {
+			if err := b.StorePayload(ctx, nil, tt.fields.object, rawPayload, tt.args.signature, tt.args.storageOpts); (err != nil) != tt.wantErr {
 				t.Errorf("Backend.StorePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

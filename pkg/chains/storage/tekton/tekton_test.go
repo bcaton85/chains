@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
+	"github.com/tektoncd/chains/pkg/test"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,20 +35,15 @@ func TestBackend_StorePayload(t *testing.T) {
 		name    string
 		payload interface{}
 		wantErr bool
+		object  objects.TektonObject
 	}{
 		{
-			name: "simple",
+			name: "simple taskrun",
 			payload: mockPayload{
 				A: "foo",
 				B: 3,
 			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx, _ := rtesting.SetupFakeContext(t)
-			c := fakepipelineclient.Get(ctx)
-			tr := &v1beta1.TaskRun{
+			object: objects.NewTaskRunObject(&v1beta1.TaskRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
@@ -59,8 +55,35 @@ func TestBackend_StorePayload(t *testing.T) {
 						},
 					},
 				},
-			}
-			if _, err := c.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr, metav1.CreateOptions{}); err != nil {
+			}),
+		},
+		{
+			name: "simple pipelinerun",
+			payload: mockPayload{
+				A: "foo",
+				B: 3,
+			},
+			object: objects.NewPipelineRunObject(&v1beta1.PipelineRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Status: v1beta1.PipelineRunStatus{
+					PipelineRunStatusFields: v1beta1.PipelineRunStatusFields{
+						PipelineResults: []v1beta1.PipelineRunResult{
+							{Name: "IMAGE_URL", Value: "mockImage"},
+						},
+					},
+				},
+			}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, _ := rtesting.SetupFakeContext(t)
+			c := fakepipelineclient.Get(ctx)
+
+			if err := test.CreateTektonObject(ctx, c, tt.object); err != nil {
 				t.Errorf("error setting up fake taskrun: %v", err)
 			}
 
@@ -74,8 +97,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			}
 			opts := config.StorageOpts{Key: "mockpayload"}
 			mockSignature := "mocksignature"
-			trObj := objects.NewTaskRunObject(tr)
-			if err := b.StorePayload(ctx, c, trObj, payload, mockSignature, opts); (err != nil) != tt.wantErr {
+			if err := b.StorePayload(ctx, c, tt.object, payload, mockSignature, opts); (err != nil) != tt.wantErr {
 				t.Errorf("Backend.StorePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
@@ -85,7 +107,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			}
 
 			payloadAnnotation := payloadName(opts)
-			payloads, err := b.RetrievePayloads(ctx, c, trObj, opts)
+			payloads, err := b.RetrievePayloads(ctx, c, tt.object, opts)
 			if err != nil {
 				t.Errorf("error base64 decoding: %v", err)
 			}
@@ -102,7 +124,7 @@ func TestBackend_StorePayload(t *testing.T) {
 
 			// Compare the signature.
 			signatureAnnotation := sigName(opts)
-			sigs, err := b.RetrieveSignatures(ctx, c, trObj, opts)
+			sigs, err := b.RetrieveSignatures(ctx, c, tt.object, opts)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/tektoncd/chains/pkg/chains/objects"
+	"github.com/tektoncd/chains/pkg/test"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,6 +53,7 @@ func TestReconciled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Test TaskRun
 			tro := objects.NewTaskRunObject(&v1beta1.TaskRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -62,6 +64,160 @@ func TestReconciled(t *testing.T) {
 			got := Reconciled(tro)
 			if got != tt.want {
 				t.Errorf("Reconciled() got = %v, want %v", got, tt.want)
+			}
+
+			// Test PipelineRun
+			pro := objects.NewPipelineRunObject(&v1beta1.PipelineRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ChainsAnnotation: tt.annotation,
+					},
+				},
+			})
+			got = Reconciled(pro)
+			if got != tt.want {
+				t.Errorf("Reconciled() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMarkSigned(t *testing.T) {
+	tests := []struct {
+		name   string
+		object objects.TektonObject
+	}{
+		{
+			name: "mark taskrun",
+			object: objects.NewTaskRunObject(&v1beta1.TaskRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-taskrun",
+				},
+				Spec: v1beta1.TaskRunSpec{
+					TaskRef: &v1beta1.TaskRef{
+						Name: "foo",
+					},
+				},
+			}),
+		},
+		{
+			name: "mark pipelinerun",
+			object: objects.NewPipelineRunObject(&v1beta1.PipelineRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-pipelinerun",
+				},
+				Spec: v1beta1.PipelineRunSpec{
+					PipelineRef: &v1beta1.PipelineRef{
+						Name: "foo",
+					},
+				},
+			}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, _ := rtesting.SetupFakeContext(t)
+			c := fakepipelineclient.Get(ctx)
+
+			if err := test.CreateTektonObject(ctx, c, tt.object); err != nil {
+				t.Fatal(err)
+			}
+
+			// Now mark it as signed.
+			if err := MarkSigned(ctx, tt.object, c, nil); err != nil {
+				t.Errorf("MarkSigned() error = %v", err)
+			}
+
+			// Now check the signature.
+			signed, err := test.GetTektonObject(ctx, c, tt.object)
+			if err != nil {
+				t.Errorf("Get() error = %v", err)
+			}
+			if _, ok := signed.GetAnnotations()[ChainsAnnotation]; !ok {
+				t.Error("Object not signed.")
+			}
+
+			// Try some extra annotations
+
+			// Now mark it as signed.
+			extra := map[string]string{
+				"foo": "bar",
+			}
+
+			if err := MarkSigned(ctx, tt.object, c, extra); err != nil {
+				t.Errorf("MarkSigned() error = %v", err)
+			}
+
+			// Now check the signature.
+			signed, err = test.GetTektonObject(ctx, c, tt.object)
+			if err != nil {
+				t.Errorf("Get() error = %v", err)
+			}
+			if _, ok := signed.GetAnnotations()[ChainsAnnotation]; !ok {
+				t.Error("Object not signed.")
+			}
+			if signed.GetAnnotations()["foo"] != "bar" {
+				t.Error("Extra annotations not applied")
+			}
+		})
+	}
+}
+
+func TestMarkFailed(t *testing.T) {
+	tests := []struct {
+		name   string
+		object objects.TektonObject
+	}{
+		{
+			name: "mark taskrun failed",
+			object: objects.NewTaskRunObject(&v1beta1.TaskRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "my-taskrun",
+					Annotations: map[string]string{RetryAnnotation: "3"},
+				},
+				Spec: v1beta1.TaskRunSpec{
+					TaskRef: &v1beta1.TaskRef{
+						Name: "foo",
+					},
+				},
+			}),
+		},
+		{
+			name: "mark pipelinerun failed",
+			object: objects.NewPipelineRunObject(&v1beta1.PipelineRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "my-pipelinerun",
+					Annotations: map[string]string{RetryAnnotation: "3"},
+				},
+				Spec: v1beta1.PipelineRunSpec{
+					PipelineRef: &v1beta1.PipelineRef{
+						Name: "foo",
+					},
+				},
+			}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, _ := rtesting.SetupFakeContext(t)
+			// Create a TR for testing
+			c := fakepipelineclient.Get(ctx)
+			if err := test.CreateTektonObject(ctx, c, tt.object); err != nil {
+				t.Fatal(err)
+			}
+
+			// Test HandleRetry, should mark it as failed
+			if err := HandleRetry(ctx, tt.object, c, nil); err != nil {
+				t.Errorf("HandleRetry() error = %v", err)
+			}
+
+			failed, err := test.GetTektonObject(ctx, c, tt.object)
+			if err != nil {
+				t.Errorf("Get() error = %v", err)
+			}
+
+			if failed.GetAnnotations()[ChainsAnnotation] != "failed" {
+				t.Errorf("Object not marked as 'failed', was: '%s'", failed.GetAnnotations()[ChainsAnnotation])
 			}
 		})
 	}
@@ -97,6 +253,7 @@ func TestRetryAvailble(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
+			// test taskrun
 			tr := &v1beta1.TaskRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: test.annotations,
@@ -107,47 +264,73 @@ func TestRetryAvailble(t *testing.T) {
 			if got != test.expected {
 				t.Fatalf("RetryAvailble() got %v expected %v", got, test.expected)
 			}
+			// test pipelinerun
+			pr := &v1beta1.PipelineRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: test.annotations,
+				},
+			}
+			prObj := objects.NewPipelineRunObject(pr)
+			got = RetryAvailable(prObj)
+			if got != test.expected {
+				t.Fatalf("RetryAvailble() got %v expected %v", got, test.expected)
+			}
 		})
 	}
 }
 
 func TestAddRetry(t *testing.T) {
-	ctx, _ := rtesting.SetupFakeContext(t)
-	c := fakepipelineclient.Get(ctx)
+	tests := []struct {
+		name   string
+		object objects.TektonObject
+	}{
+		{
+			name: "add retry to taskrun",
+			object: objects.NewTaskRunObject(&v1beta1.TaskRun{
+				ObjectMeta: metav1.ObjectMeta{Name: "mytaskrun"},
+			}),
+		},
+		{
+			name: "add retry to pipelinerun",
+			object: objects.NewPipelineRunObject(&v1beta1.PipelineRun{
+				ObjectMeta: metav1.ObjectMeta{Name: "mypipelinerun"},
+			}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, _ := rtesting.SetupFakeContext(t)
+			c := fakepipelineclient.Get(ctx)
 
-	tr := &v1beta1.TaskRun{
-		ObjectMeta: metav1.ObjectMeta{Name: "mytaskrun"},
-	}
-	if _, err := c.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr, metav1.CreateOptions{}); err != nil {
-		t.Fatal(err)
-	}
+			if err := test.CreateTektonObject(ctx, c, tt.object); err != nil {
+				t.Fatal(err)
+			}
 
-	trObj := objects.NewTaskRunObject(tr)
+			// run it through AddRetry, make sure annotation is added
+			if err := AddRetry(ctx, tt.object, c, nil); err != nil {
+				t.Fatal(err)
+			}
 
-	// run it through AddRetry, make sure annotation is added
-	if err := AddRetry(ctx, trObj, c, nil); err != nil {
-		t.Fatal(err)
-	}
+			signed, err := test.GetTektonObject(ctx, c, tt.object)
+			if err != nil {
+				t.Errorf("Get() error = %v", err)
+			}
 
-	signed, err := c.TektonV1beta1().TaskRuns(tr.Namespace).Get(ctx, tr.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("Get() error = %v", err)
-	}
+			if val, ok := signed.GetAnnotations()[RetryAnnotation]; !ok || val != "0" {
+				t.Fatalf("annotation isn't correct: %v %v", ok, val)
+			}
 
-	if val, ok := signed.Annotations[RetryAnnotation]; !ok || val != "0" {
-		t.Fatalf("annotation isn't correct: %v %v", ok, val)
-	}
-
-	// run it again, make sure we see an increase
-	trObj = objects.NewTaskRunObject(signed)
-	if err := AddRetry(ctx, trObj, c, nil); err != nil {
-		t.Fatal(err)
-	}
-	signed, err = c.TektonV1beta1().TaskRuns(tr.Namespace).Get(ctx, tr.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("Get() error = %v", err)
-	}
-	if val, ok := signed.Annotations[RetryAnnotation]; val != "1" {
-		t.Fatalf("annotation isn't correct: %v %v", ok, val)
+			// run it again, make sure we see an increase
+			if err := AddRetry(ctx, signed, c, nil); err != nil {
+				t.Fatal(err)
+			}
+			signed, err = test.GetTektonObject(ctx, c, tt.object)
+			if err != nil {
+				t.Errorf("Get() error = %v", err)
+			}
+			if val, ok := signed.GetAnnotations()[RetryAnnotation]; val != "1" {
+				t.Fatalf("annotation isn't correct: %v %v", ok, val)
+			}
+		})
 	}
 }
