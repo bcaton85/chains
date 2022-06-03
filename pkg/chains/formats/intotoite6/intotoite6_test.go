@@ -17,12 +17,11 @@ limitations under the License.
 package intotoite6
 
 import (
-	"encoding/json"
-	"io/ioutil"
 	"testing"
 	"time"
 
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/pipelinerun"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/taskrun"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
 	"github.com/tektoncd/chains/pkg/config"
@@ -37,8 +36,11 @@ import (
 var e1BuildStart = time.Unix(1617011400, 0)
 var e1BuildFinished = time.Unix(1617011415, 0)
 
-func TestCreatePayload1(t *testing.T) {
-	tr := taskrunFromFile(t, "testdata/taskrun1.json")
+func TestTaskRunCreatePayload1(t *testing.T) {
+	tr, err := util.TaskrunFromFile("testdata/taskrun1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	cfg := config.Config{
 		Builder: config.BuilderConfig{
@@ -117,8 +119,156 @@ func TestCreatePayload1(t *testing.T) {
 	}
 }
 
-func TestCreatePayload2(t *testing.T) {
-	tr := taskrunFromFile(t, "testdata/taskrun2.json")
+func TestPipelineRunCreatePayload(t *testing.T) {
+	tr, err := util.PipelinerunFromFile("testdata/pipelinerun1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Config{
+		Builder: config.BuilderConfig{
+			ID: "test_builder-1",
+		},
+	}
+	expected := in_toto.ProvenanceStatement{
+		StatementHeader: in_toto.StatementHeader{
+			Type:          in_toto.StatementInTotoV01,
+			PredicateType: slsa.PredicateSLSAProvenance,
+			Subject: []in_toto.Subject{
+				{
+					Name: "test.io/test/image",
+					Digest: slsa.DigestSet{
+						"sha256": "827521c857fdcd4374f4da5442fbae2edb01e7fbae285c3ec15673d4c1daecb7",
+					},
+				},
+			},
+		},
+		Predicate: slsa.ProvenancePredicate{
+			Metadata: &slsa.ProvenanceMetadata{
+				BuildStartedOn:  &e1BuildStart,
+				BuildFinishedOn: &e1BuildFinished,
+				Completeness: slsa.ProvenanceComplete{
+					Parameters:  false,
+					Environment: false,
+					Materials:   false,
+				},
+				Reproducible: false,
+			},
+			Materials: []slsa.ProvenanceMaterial{
+				{URI: "git+https://git.test.com.git", Digest: slsa.DigestSet{"sha1": "abcd"}},
+			},
+			Invocation: slsa.ProvenanceInvocation{
+				ConfigSource: slsa.ConfigSource{},
+				Parameters: map[string]string{
+					"IMAGE": `"test.io/test/image"`,
+				},
+			},
+			Builder: slsa.ProvenanceBuilder{
+				ID: "test_builder-1",
+			},
+			BuildType: "https://tekton.dev/attestations/chains/pipelinerun@v2",
+			BuildConfig: pipelinerun.BuildConfig{
+				Tasks: []pipelinerun.TaskAttestation{
+					{
+						Name:  "git-clone",
+						After: nil,
+						Ref: v1beta1.TaskRef{
+							Name: "git-clone",
+							Kind: "ClusterTask",
+						},
+						StartedOn:  e1BuildStart,
+						FinishedOn: e1BuildFinished,
+						Status:     "Succeeded",
+						Steps: []util.StepAttestation{
+							{
+								EntryPoint: "git clone",
+								Arguments:  []string(nil),
+								Environment: map[string]interface{}{
+									"container": "clone",
+									"image":     "test.io/test/clone-image",
+								},
+								Annotations: nil,
+							},
+						},
+						Invocation: slsa.ProvenanceInvocation{
+							ConfigSource: slsa.ConfigSource{},
+							Parameters: map[string]string{
+								"revision": "\"\"",
+								"url":      "\"https://git.test.com\"",
+							},
+						},
+						Results: []v1beta1.TaskRunResult{
+							{
+								Name:  "commit",
+								Value: "abcd",
+							},
+							{
+								Name:  "url",
+								Value: "https://git.test.com",
+							},
+						},
+					},
+					{
+						Name:  "build",
+						After: []string{"git-clone"},
+						Ref: v1beta1.TaskRef{
+							Name: "build",
+							Kind: "ClusterTask",
+						},
+						StartedOn:  e1BuildStart,
+						FinishedOn: e1BuildFinished,
+						Status:     "Succeeded",
+						Steps: []util.StepAttestation{
+							{
+								EntryPoint: "buildah build",
+								Arguments:  []string(nil),
+								Environment: map[string]interface{}{
+									"image":     "test.io/test/build-image",
+									"container": "build",
+								},
+								Annotations: nil,
+							},
+						},
+						Invocation: slsa.ProvenanceInvocation{
+							ConfigSource: slsa.ConfigSource{},
+							Parameters: map[string]string{
+								"CHAINS-GIT_COMMIT": "\"$(tasks.git-clone.results.commit)\"",
+								"CHAINS-GIT_URL":    "\"$(tasks.git-clone.results.url)\"",
+							},
+						},
+						Results: []v1beta1.TaskRunResult{
+							{
+								Name:  "IMAGE_DIGEST",
+								Value: "sha256:827521c857fdcd4374f4da5442fbae2edb01e7fbae285c3ec15673d4c1daecb7",
+							},
+							{
+								Name:  "IMAGE_URL",
+								Value: "test.io/test/image\n",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	i, _ := NewFormatter(cfg, logtesting.TestLogger(t))
+
+	got, err := i.CreatePayload(tr)
+
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+	}
+	if diff := cmp.Diff(expected, got); diff != "" {
+		t.Errorf("InTotoIte6.CreatePayload(): -want +got: %s", diff)
+	}
+}
+
+func TestTaskRunCreatePayload2(t *testing.T) {
+	tr, err := util.TaskrunFromFile("testdata/taskrun2.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	cfg := config.Config{
 		Builder: config.BuilderConfig{
 			ID: "test_builder-2",
@@ -164,7 +314,11 @@ func TestCreatePayload2(t *testing.T) {
 }
 
 func TestCreatePayloadNilTaskRef(t *testing.T) {
-	tr := taskrunFromFile(t, "testdata/taskrun1.json")
+	tr, err := util.TaskrunFromFile("testdata/taskrun1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	tr.Spec.TaskRef = nil
 	cfg := config.Config{
 		Builder: config.BuilderConfig{
@@ -185,7 +339,11 @@ func TestCreatePayloadNilTaskRef(t *testing.T) {
 }
 
 func TestMultipleSubjects(t *testing.T) {
-	tr := taskrunFromFile(t, "testdata/taskrun-multiple-subjects.json")
+	tr, err := util.TaskrunFromFile("testdata/taskrun-multiple-subjects.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	cfg := config.Config{
 		Builder: config.BuilderConfig{
 			ID: "test_builder-multiple",
@@ -289,16 +447,4 @@ func TestCorrectPayloadType(t *testing.T) {
 	if i.Type() != formats.PayloadTypeInTotoIte6 {
 		t.Errorf("Invalid type returned: %s", i.Type())
 	}
-}
-
-func taskrunFromFile(t *testing.T, f string) *v1beta1.TaskRun {
-	contents, err := ioutil.ReadFile(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var tr v1beta1.TaskRun
-	if err := json.Unmarshal(contents, &tr); err != nil {
-		t.Fatal(err)
-	}
-	return &tr
 }
