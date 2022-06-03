@@ -11,7 +11,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package taskrun
+package pipelinerun
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	informers "github.com/tektoncd/pipeline/pkg/client/informers/externalversions/pipeline/v1beta1"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
-	faketaskruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/taskrun/fake"
+	fakepipelineruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/pipelinerun/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,19 +38,19 @@ import (
 
 func TestReconciler_Reconcile(t *testing.T) {
 	tests := []struct {
-		name     string
-		key      string
-		taskRuns []*v1beta1.TaskRun
+		name         string
+		key          string
+		pipelineRuns []*v1beta1.PipelineRun
 	}{
 		{
-			name:     "no taskruns",
-			key:      "foo/bar",
-			taskRuns: []*v1beta1.TaskRun{},
+			name:         "no pipelineRuns",
+			key:          "foo/bar",
+			pipelineRuns: []*v1beta1.PipelineRun{},
 		},
 		{
-			name: "found taskrun",
+			name: "found PipelineRun",
 			key:  "foo/bar",
-			taskRuns: []*v1beta1.TaskRun{
+			pipelineRuns: []*v1beta1.PipelineRun{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar",
@@ -64,7 +64,7 @@ func TestReconciler_Reconcile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			ctx, _ := rtesting.SetupFakeContext(t)
-			setupData(ctx, t, tt.taskRuns)
+			setupData(ctx, t, tt.pipelineRuns)
 
 			configMapWatcher := configmap.NewStaticWatcher(&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
@@ -87,34 +87,34 @@ func TestReconciler_Reconcile(t *testing.T) {
 	}
 }
 
-func setupData(ctx context.Context, t *testing.T, trs []*v1beta1.TaskRun) informers.TaskRunInformer {
-	tri := faketaskruninformer.Get(ctx)
+func setupData(ctx context.Context, t *testing.T, prs []*v1beta1.PipelineRun) informers.PipelineRunInformer {
+	pri := fakepipelineruninformer.Get(ctx)
 	c := fakepipelineclient.Get(ctx)
 
-	for _, ta := range trs {
-		ta := ta.DeepCopy() // Avoid assumptions that the informer's copy is modified.
-		if _, err := c.TektonV1beta1().TaskRuns(ta.Namespace).Create(ctx, ta, metav1.CreateOptions{}); err != nil {
+	for _, pa := range prs {
+		pa := pa.DeepCopy() // Avoid assumptions that the informer's copy is modified.
+		if _, err := c.TektonV1beta1().PipelineRuns(pa.Namespace).Create(ctx, pa, metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	c.ClearActions()
-	return tri
+	return pri
 }
 
-func TestReconciler_handleTaskRun(t *testing.T) {
+func TestReconciler_handlePipelineRun(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		tr         *v1beta1.TaskRun
+		pr         *v1beta1.PipelineRun
 		shouldSign bool
 	}{
 		{
 			name: "complete, already signed",
-			tr: &v1beta1.TaskRun{
+			pr: &v1beta1.PipelineRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{signing.ChainsAnnotation: "true"},
 				},
-				Status: v1beta1.TaskRunStatus{
+				Status: v1beta1.PipelineRunStatus{
 					Status: duckv1beta1.Status{
 						Conditions: []apis.Condition{{Type: apis.ConditionSucceeded}},
 					}},
@@ -123,11 +123,11 @@ func TestReconciler_handleTaskRun(t *testing.T) {
 		},
 		{
 			name: "complete, not already signed",
-			tr: &v1beta1.TaskRun{
+			pr: &v1beta1.PipelineRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{},
 				},
-				Status: v1beta1.TaskRunStatus{
+				Status: v1beta1.PipelineRunStatus{
 					Status: duckv1beta1.Status{
 						Conditions: []apis.Condition{{Type: apis.ConditionSucceeded}},
 					}},
@@ -136,11 +136,11 @@ func TestReconciler_handleTaskRun(t *testing.T) {
 		},
 		{
 			name: "not complete, not already signed",
-			tr: &v1beta1.TaskRun{
+			pr: &v1beta1.PipelineRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{},
 				},
-				Status: v1beta1.TaskRunStatus{
+				Status: v1beta1.PipelineRunStatus{
 					Status: duckv1beta1.Status{
 						Conditions: []apis.Condition{},
 					}},
@@ -154,13 +154,13 @@ func TestReconciler_handleTaskRun(t *testing.T) {
 			ctx, _ := rtesting.SetupFakeContext(t)
 
 			r := &Reconciler{
-				TaskRunSigner: signer,
+				PipelineRunSigner: signer,
 			}
-			if err := r.ReconcileKind(ctx, tt.tr); err != nil {
-				t.Errorf("Reconciler.handleTaskRun() error = %v", err)
+			if err := r.ReconcileKind(ctx, tt.pr); err != nil {
+				t.Errorf("Reconciler.handlePipelineRun() error = %v", err)
 			}
 			if signer.Signed != tt.shouldSign {
-				t.Errorf("Reconciler.handleTaskRun() signed = %v, wanted %v", signer.Signed, tt.shouldSign)
+				t.Errorf("Reconciler.handlePipelineRun() signed = %v, wanted %v", signer.Signed, tt.shouldSign)
 			}
 		})
 	}
