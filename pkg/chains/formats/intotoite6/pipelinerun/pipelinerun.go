@@ -83,7 +83,7 @@ func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig
 	var last string
 	for i, tr := range pipelineTasks {
 		trStatus := trStatuses[tr.Name]
-		if trStatus == nil {
+		if trStatus == nil || trStatus.Status == nil {
 			// Ignore Tasks that did not execute during the PipelineRun.
 			continue
 		}
@@ -99,7 +99,12 @@ func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig
 			after = append(after, last)
 		}
 		params := tr.Params
-		paramSpecs := trStatus.Status.TaskSpec.Params
+		var paramSpecs []v1beta1.ParamSpec
+		if trStatus.Status.TaskSpec != nil {
+			paramSpecs = trStatus.Status.TaskSpec.Params
+		} else {
+			paramSpecs = []v1beta1.ParamSpec{}
+		}
 		task := TaskAttestation{
 			Name:       trStatus.PipelineTaskName,
 			After:      after,
