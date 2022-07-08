@@ -20,6 +20,7 @@ import (
 	signing "github.com/tektoncd/chains/pkg/chains"
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
+	"github.com/tektoncd/chains/pkg/test"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	informers "github.com/tektoncd/pipeline/pkg/client/informers/externalversions/pipeline/v1beta1"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
@@ -106,7 +107,9 @@ func TestReconciler_handlePipelineRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		pr         *v1beta1.PipelineRun
+		taskruns   []*v1beta1.TaskRun
 		shouldSign bool
+		wantErr    bool
 	}{
 		{
 			name: "complete, already signed",
@@ -147,16 +150,98 @@ func TestReconciler_handlePipelineRun(t *testing.T) {
 			},
 			shouldSign: false,
 		},
+		{
+			name: "taskruns completed",
+			pr: &v1beta1.PipelineRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+				Status: v1beta1.PipelineRunStatus{
+					Status: duckv1beta1.Status{
+						Conditions: []apis.Condition{{Type: apis.ConditionSucceeded}},
+					},
+					PipelineRunStatusFields: v1beta1.PipelineRunStatusFields{
+						TaskRuns: map[string]*v1beta1.PipelineRunTaskRunStatus{
+							"taskrun1": {
+								PipelineTaskName: "task1",
+								Status: &v1beta1.TaskRunStatus{
+									TaskRunStatusFields: v1beta1.TaskRunStatusFields{
+										CompletionTime: &metav1.Time{},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			taskruns: []*v1beta1.TaskRun{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "taskrun1",
+						Annotations: map[string]string{
+							"chains.tekton.dev/signed": "true",
+						},
+					},
+				},
+			},
+			shouldSign: true,
+			wantErr:    false,
+		},
+		{
+			name: "taskruns not yet completed",
+			pr: &v1beta1.PipelineRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+				Status: v1beta1.PipelineRunStatus{
+					Status: duckv1beta1.Status{
+						Conditions: []apis.Condition{{Type: apis.ConditionSucceeded}},
+					},
+					PipelineRunStatusFields: v1beta1.PipelineRunStatusFields{
+						TaskRuns: map[string]*v1beta1.PipelineRunTaskRunStatus{
+							"taskrun1": {
+								PipelineTaskName: "task1",
+								Status: &v1beta1.TaskRunStatus{
+									TaskRunStatusFields: v1beta1.TaskRunStatusFields{
+										CompletionTime: &metav1.Time{},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			taskruns: []*v1beta1.TaskRun{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "taskrun1",
+					},
+				},
+			},
+			shouldSign: false,
+			wantErr:    true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			signer := &mockSigner{}
 			ctx, _ := rtesting.SetupFakeContext(t)
+			c := fakepipelineclient.Get(ctx)
 
 			r := &Reconciler{
 				PipelineRunSigner: signer,
+				Pipelineclientset: c,
 			}
-			if err := r.ReconcileKind(ctx, tt.pr); err != nil {
+
+			// Create mock taskruns
+			for _, tr := range tt.taskruns {
+				err := test.CreateTektonObject(ctx, r.Pipelineclientset, objects.NewTaskRunObject(tr))
+				if err != nil {
+					t.Errorf("Unable to create mock taskrun: %s", tr.Name)
+				}
+			}
+
+			if err := r.ReconcileKind(ctx, tt.pr); err != nil && !tt.wantErr {
 				t.Errorf("Reconciler.handlePipelineRun() error = %v", err)
 			}
 			if signer.Signed != tt.shouldSign {

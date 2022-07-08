@@ -42,6 +42,7 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 
 	c := &Reconciler{
 		PipelineRunSigner: psSigner,
+		Pipelineclientset: pipelineClient,
 	}
 	impl := pipelinerunreconciler.NewImpl(ctx, c, func(impl *controller.Impl) controller.Options {
 		cfgStore := config.NewConfigStore(logger, func(name string, value interface{}) {
