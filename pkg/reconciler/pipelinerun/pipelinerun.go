@@ -76,6 +76,12 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) 
 				name, pr.Namespace, pr.Name)
 			return nil
 		}
+	}
+
+	// Signing both taskruns and pipelineruns causes a race condition when using oci storage
+	// during the push to the registry. This checks the taskruns to ensure they've been reconciled
+	// before attempting to sign the pippelinerun
+	for name, _ := range pr.Status.TaskRuns {
 		reconciled, err := isTaskRunReconciled(ctx, r.Pipelineclientset, pr.Namespace, name)
 		if err != nil {
 			logging.FromContext(ctx).Errorf(
