@@ -78,7 +78,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 					},
 				},
 			}),
-			want: []interface{}{digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5")},
+			want: []interface{}{createDigest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5")},
 		},
 		{
 			name: "two images",
@@ -248,7 +248,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 					},
 				},
 			}),
-			want: []interface{}{digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5")},
+			want: []interface{}{createDigest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5")},
 		}, {
 			name: "images",
 			obj: objects.NewTaskRunObject(&v1beta1.TaskRun{
@@ -369,7 +369,7 @@ func TestExtractSignableTargetFromResults(t *testing.T) {
 		{URI: "projects/test-project/locations/us-west4/repositories/test-repo/mavenArtifacts/a.b.c:d:1.0-jre", Digest: digest4},
 		{URI: "projects/test-project/locations/us-west4/repositories/test-repo/mavenArtifacts/empty_prefix", Digest: digest1},
 	}
-	got := ExtractSignableTargetFromResults(tr, logtesting.TestLogger(t))
+	got := ExtractSignableTargetFromResults(objects.NewTaskRunObject(tr), logtesting.TestLogger(t))
 	sort.Slice(got, func(i, j int) bool {
 		return got[i].URI < got[j].URI
 	})

@@ -43,6 +43,7 @@ const (
 // It also goes through looking for any PipelineResources of Image type
 func GetSubjectDigests(obj objects.TektonObject, logger *zap.SugaredLogger) []intoto.Subject {
 	var subjects []intoto.Subject
+
 	imgs := artifacts.ExtractOCIImagesFromResults(obj, logger)
 	for _, i := range imgs {
 		if d, ok := i.(name.Digest); ok {
@@ -53,6 +54,21 @@ func GetSubjectDigests(obj objects.TektonObject, logger *zap.SugaredLogger) []in
 				},
 			})
 		}
+	}
+
+	sts := artifacts.ExtractSignableTargetFromResults(obj, logger)
+	for _, obj := range sts {
+		splits := strings.Split(obj.Digest, ":")
+		if len(splits) != 2 {
+			logger.Errorf("Digest %s should be in the format of: algorthm:abc", obj.Digest)
+			continue
+		}
+		subjects = append(subjects, intoto.Subject{
+			Name: obj.URI,
+			Digest: slsa.DigestSet{
+				splits[0]: splits[1],
+			},
+		})
 	}
 
 	// Check if object is a Taskrun, if so search for images used in PipelineResources
@@ -137,28 +153,18 @@ func AttestStep(step *v1beta1.Step, stepState *v1beta1.StepState) StepAttestatio
 
 func AttestInvocation(params []v1beta1.Param, paramSpecs []v1beta1.ParamSpec, logger *zap.SugaredLogger) slsa.ProvenanceInvocation {
 	i := slsa.ProvenanceInvocation{}
-	iParams := make(map[string]string)
+	iParams := make(map[string]v1beta1.ArrayOrString)
 
 	// get implicit parameters from defaults
 	for _, p := range paramSpecs {
 		if p.Default != nil {
-			v, err := p.Default.MarshalJSON()
-			if err != nil {
-				logger.Errorf("Unable to marshall %q default parameter: %s", p, err)
-				continue
-			}
-			iParams[p.Name] = string(v)
+			iParams[p.Name] = *p.Default
 		}
 	}
 
 	// get explicit parameters
 	for _, p := range params {
-		v, err := p.Value.MarshalJSON()
-		if err != nil {
-			logger.Errorf("Unable to marshall %q parameter: %s", p, err)
-			continue
-		}
-		iParams[p.Name] = string(v)
+		iParams[p.Name] = p.Value
 	}
 
 	i.Parameters = iParams

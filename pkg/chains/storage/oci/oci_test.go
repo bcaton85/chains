@@ -191,7 +191,7 @@ func TestBackend_StorePayload(t *testing.T) {
 		{
 			name: "in-toto-and-simple-payload",
 			fields: fields{
-				tr: tr,
+				object: objects.NewTaskRunObject(tr),
 			},
 			args: args{
 				payload:   simple,
@@ -205,7 +205,7 @@ func TestBackend_StorePayload(t *testing.T) {
 		{
 			name: "tekton-and-simple-payload",
 			fields: fields{
-				tr: tr,
+				object: objects.NewTaskRunObject(tr),
 			},
 			args: args{
 				payload:   simple,
