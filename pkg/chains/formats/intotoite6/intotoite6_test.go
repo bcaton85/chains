@@ -159,8 +159,8 @@ func TestPipelineRunCreatePayload(t *testing.T) {
 			},
 			Invocation: slsa.ProvenanceInvocation{
 				ConfigSource: slsa.ConfigSource{},
-				Parameters: map[string]string{
-					"IMAGE": `"test.io/test/image"`,
+				Parameters: map[string]v1beta1.ArrayOrString{
+					"IMAGE": {Type: "string", StringVal: "test.io/test/image"},
 				},
 			},
 			Builder: slsa.ProvenanceBuilder{
@@ -192,19 +192,25 @@ func TestPipelineRunCreatePayload(t *testing.T) {
 						},
 						Invocation: slsa.ProvenanceInvocation{
 							ConfigSource: slsa.ConfigSource{},
-							Parameters: map[string]string{
-								"revision": "\"\"",
-								"url":      "\"https://git.test.com\"",
+							Parameters: map[string]v1beta1.ArrayOrString{
+								"revision": {Type: "string", StringVal: ""},
+								"url":      {Type: "string", StringVal: "https://git.test.com"},
 							},
 						},
 						Results: []v1beta1.TaskRunResult{
 							{
-								Name:  "commit",
-								Value: "abcd",
+								Name: "commit",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "abcd",
+								},
 							},
 							{
-								Name:  "url",
-								Value: "https://git.test.com",
+								Name: "url",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "https://git.test.com",
+								},
 							},
 						},
 					},
@@ -231,19 +237,25 @@ func TestPipelineRunCreatePayload(t *testing.T) {
 						},
 						Invocation: slsa.ProvenanceInvocation{
 							ConfigSource: slsa.ConfigSource{},
-							Parameters: map[string]string{
-								"CHAINS-GIT_COMMIT": "\"$(tasks.git-clone.results.commit)\"",
-								"CHAINS-GIT_URL":    "\"$(tasks.git-clone.results.url)\"",
+							Parameters: map[string]v1beta1.ArrayOrString{
+								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "$(tasks.git-clone.results.commit)"},
+								"CHAINS-GIT_URL":    {Type: "string", StringVal: "$(tasks.git-clone.results.url)"},
 							},
 						},
 						Results: []v1beta1.TaskRunResult{
 							{
-								Name:  "IMAGE_DIGEST",
-								Value: "sha256:827521c857fdcd4374f4da5442fbae2edb01e7fbae285c3ec15673d4c1daecb7",
+								Name: "IMAGE_DIGEST",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "sha256:827521c857fdcd4374f4da5442fbae2edb01e7fbae285c3ec15673d4c1daecb7",
+								},
 							},
 							{
-								Name:  "IMAGE_URL",
-								Value: "test.io/test/image\n",
+								Name: "IMAGE_URL",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "test.io/test/image\n",
+								},
 							},
 						},
 					},
