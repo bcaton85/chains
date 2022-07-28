@@ -147,10 +147,10 @@ func gitInfo(tr *v1beta1.TaskRun) (commit string, url string) {
 
 	for _, r := range tr.Status.TaskRunResults {
 		if r.Name == util.CommitParam {
-			commit = r.Value
+			commit = r.Value.StringVal
 		}
 		if r.Name == util.UrlParam {
-			url = r.Value
+			url = r.Value.StringVal
 		}
 	}
 
