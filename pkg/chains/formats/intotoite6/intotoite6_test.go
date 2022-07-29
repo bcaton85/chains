@@ -24,13 +24,17 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/pipelinerun"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/taskrun"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
+	"github.com/tektoncd/chains/pkg/test"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/in-toto/in-toto-golang/in_toto"
 	slsa "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	logtesting "knative.dev/pkg/logging/testing"
+	rtesting "knative.dev/pkg/reconciler/testing"
 )
 
 var e1BuildStart = time.Unix(1617011400, 0)
@@ -107,7 +111,9 @@ func TestTaskRunCreatePayload1(t *testing.T) {
 			},
 		},
 	}
-	i, _ := NewFormatter(cfg, logtesting.TestLogger(t))
+	ctx, _ := rtesting.SetupFakeContext(t)
+	ps := fakepipelineclient.Get(ctx)
+	i, _ := NewFormatter(ctx, ps, cfg, logtesting.TestLogger(t))
 
 	got, err := i.CreatePayload(tr)
 
@@ -120,7 +126,7 @@ func TestTaskRunCreatePayload1(t *testing.T) {
 }
 
 func TestPipelineRunCreatePayload(t *testing.T) {
-	tr, err := util.PipelinerunFromFile("testdata/pipelinerun1.json")
+	pr, err := util.PipelinerunFromFile("testdata/pipelinerun1.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,10 +269,194 @@ func TestPipelineRunCreatePayload(t *testing.T) {
 			},
 		},
 	}
-	i, _ := NewFormatter(cfg, logtesting.TestLogger(t))
+	ctx, _ := rtesting.SetupFakeContext(t)
+	ps := fakepipelineclient.Get(ctx)
+	i, _ := NewFormatter(ctx, ps, cfg, logtesting.TestLogger(t))
 
-	got, err := i.CreatePayload(tr)
+	got, err := i.CreatePayload(pr)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+	}
+	if diff := cmp.Diff(expected, got); diff != "" {
+		t.Errorf("InTotoIte6.CreatePayload(): -want +got: %s", diff)
+	}
+}
+func TestPipelineRunCreatePayloadChildRefs(t *testing.T) {
+	pr, err := util.PipelinerunFromFile("testdata/pipelinerun-childrefs.json")
+	if err != nil {
+		t.Fatal(err)
+	}
 
+	cfg := config.Config{
+		Builder: config.BuilderConfig{
+			ID: "test_builder-1",
+		},
+	}
+	expected := in_toto.ProvenanceStatement{
+		StatementHeader: in_toto.StatementHeader{
+			Type:          in_toto.StatementInTotoV01,
+			PredicateType: slsa.PredicateSLSAProvenance,
+			Subject: []in_toto.Subject{
+				{
+					Name: "test.io/test/image",
+					Digest: slsa.DigestSet{
+						"sha256": "827521c857fdcd4374f4da5442fbae2edb01e7fbae285c3ec15673d4c1daecb7",
+					},
+				},
+			},
+		},
+		Predicate: slsa.ProvenancePredicate{
+			Metadata: &slsa.ProvenanceMetadata{
+				BuildStartedOn:  &e1BuildStart,
+				BuildFinishedOn: &e1BuildFinished,
+				Completeness: slsa.ProvenanceComplete{
+					Parameters:  false,
+					Environment: false,
+					Materials:   false,
+				},
+				Reproducible: false,
+			},
+			Materials: []slsa.ProvenanceMaterial{
+				{URI: "git+https://git.test.com.git", Digest: slsa.DigestSet{"sha1": "abcd"}},
+			},
+			Invocation: slsa.ProvenanceInvocation{
+				ConfigSource: slsa.ConfigSource{},
+				Parameters: map[string]v1beta1.ArrayOrString{
+					"IMAGE": {Type: "string", StringVal: "test.io/test/image"},
+				},
+			},
+			Builder: slsa.ProvenanceBuilder{
+				ID: "test_builder-1",
+			},
+			BuildType: "https://tekton.dev/attestations/chains/pipelinerun@v2",
+			BuildConfig: pipelinerun.BuildConfig{
+				Tasks: []pipelinerun.TaskAttestation{
+					{
+						Name:  "git-clone",
+						After: nil,
+						Ref: v1beta1.TaskRef{
+							Name: "git-clone",
+							Kind: "ClusterTask",
+						},
+						StartedOn:  e1BuildStart,
+						FinishedOn: e1BuildFinished,
+						Status:     "Succeeded",
+						Steps: []util.StepAttestation{
+							{
+								EntryPoint: "git clone",
+								Arguments:  []string(nil),
+								Environment: map[string]interface{}{
+									"container": "step1",
+									"image":     "docker-pullable://gcr.io/test1/test1@sha256:d4b63d3e24d6eef04a6dc0795cf8a73470688803d97c52cffa3c8d4efd3397b6",
+								},
+								Annotations: nil,
+							},
+						},
+						Invocation: slsa.ProvenanceInvocation{
+							ConfigSource: slsa.ConfigSource{},
+							Parameters: map[string]v1beta1.ArrayOrString{
+								"revision": {Type: "string", StringVal: ""},
+								"url":      {Type: "string", StringVal: "https://git.test.com"},
+							},
+						},
+						Results: []v1beta1.TaskRunResult{
+							{
+								Name: "some-uri_DIGEST",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "sha256:d4b63d3e24d6eef04a6dc0795cf8a73470688803d97c52cffa3c8d4efd3397b6",
+								},
+							},
+							{
+								Name: "some-uri",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "pkg:deb/debian/curl@7.50.3-1",
+								},
+							},
+						},
+					},
+					{
+						Name:  "build",
+						After: []string{"git-clone"},
+						Ref: v1beta1.TaskRef{
+							Name: "build",
+							Kind: "ClusterTask",
+						},
+						StartedOn:  e1BuildStart,
+						FinishedOn: e1BuildFinished,
+						Status:     "Succeeded",
+						Steps: []util.StepAttestation{
+							{
+								EntryPoint: "",
+								Arguments:  []string(nil),
+								Environment: map[string]interface{}{
+									"image":     "docker-pullable://gcr.io/test1/test1@sha256:d4b63d3e24d6eef04a6dc0795cf8a73470688803d97c52cffa3c8d4efd3397b6",
+									"container": "step1",
+								},
+								Annotations: nil,
+							},
+							{
+								EntryPoint: "",
+								Arguments:  []string(nil),
+								Environment: map[string]interface{}{
+									"image":     "docker-pullable://gcr.io/test2/test2@sha256:4d6dd704ef58cb214dd826519929e92a978a57cdee43693006139c0080fd6fac",
+									"container": "step2",
+								},
+								Annotations: nil,
+							},
+							{
+								EntryPoint: "",
+								Arguments:  []string(nil),
+								Environment: map[string]interface{}{
+									"image":     "docker-pullable://gcr.io/test3/test3@sha256:f1a8b8549c179f41e27ff3db0fe1a1793e4b109da46586501a8343637b1d0478",
+									"container": "step3",
+								},
+								Annotations: nil,
+							},
+						},
+						Invocation: slsa.ProvenanceInvocation{
+							ConfigSource: slsa.ConfigSource{},
+							Parameters: map[string]v1beta1.ArrayOrString{
+								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "$(tasks.git-clone.results.commit)"},
+								"CHAINS-GIT_URL":    {Type: "string", StringVal: "$(tasks.git-clone.results.url)"},
+							},
+						},
+						Results: []v1beta1.TaskRunResult{
+							{
+								Name: "IMAGE_DIGEST",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "sha256:827521c857fdcd4374f4da5442fbae2edb01e7fbae285c3ec15673d4c1daecb7",
+								},
+							},
+							{
+								Name: "IMAGE_URL",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "gcr.io/my/image",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	ctx, _ := rtesting.SetupFakeContext(t)
+	ps := fakepipelineclient.Get(ctx)
+	tr1, err := util.TaskrunFromFile("testdata/taskrun1.json")
+	if err != nil {
+		t.Errorf("error reading taskrun1: %s", err.Error())
+	}
+	tr2, err := util.TaskrunFromFile("testdata/taskrun2.json")
+	if err != nil {
+		t.Errorf("error reading taskrun: %s", err.Error())
+	}
+	test.CreateTektonObject(ctx, ps, objects.NewTaskRunObject(tr1))
+	test.CreateTektonObject(ctx, ps, objects.NewTaskRunObject(tr2))
+	i, _ := NewFormatter(ctx, ps, cfg, logtesting.TestLogger(t))
+	got, err := i.CreatePayload(pr)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err.Error())
 	}
@@ -293,7 +483,10 @@ func TestTaskRunCreatePayload2(t *testing.T) {
 			Subject:       nil,
 		},
 		Predicate: slsa.ProvenancePredicate{
-			Metadata: &slsa.ProvenanceMetadata{},
+			Metadata: &slsa.ProvenanceMetadata{
+				BuildStartedOn:  &e1BuildStart,
+				BuildFinishedOn: &e1BuildFinished,
+			},
 			Builder: slsa.ProvenanceBuilder{
 				ID: "test_builder-2",
 			},
@@ -304,7 +497,8 @@ func TestTaskRunCreatePayload2(t *testing.T) {
 			BuildConfig: taskrun.BuildConfig{
 				Steps: []util.StepAttestation{
 					{
-						Arguments: []string(nil),
+						EntryPoint: "git clone",
+						Arguments:  []string(nil),
 						Environment: map[string]interface{}{
 							"container": string("step1"),
 							"image":     string("docker-pullable://gcr.io/test1/test1@sha256:d4b63d3e24d6eef04a6dc0795cf8a73470688803d97c52cffa3c8d4efd3397b6"),
@@ -314,7 +508,9 @@ func TestTaskRunCreatePayload2(t *testing.T) {
 			},
 		},
 	}
-	i, _ := NewFormatter(cfg, logtesting.TestLogger(t))
+	ctx, _ := rtesting.SetupFakeContext(t)
+	ps := fakepipelineclient.Get(ctx)
+	i, _ := NewFormatter(ctx, ps, cfg, logtesting.TestLogger(t))
 	got, err := i.CreatePayload(tr)
 
 	if err != nil {
@@ -337,7 +533,9 @@ func TestCreatePayloadNilTaskRef(t *testing.T) {
 			ID: "testid",
 		},
 	}
-	f, _ := NewFormatter(cfg, logtesting.TestLogger(t))
+	ctx, _ := rtesting.SetupFakeContext(t)
+	c := fakepipelineclient.Get(ctx)
+	f, _ := NewFormatter(ctx, c, cfg, logtesting.TestLogger(t))
 
 	p, err := f.CreatePayload(tr)
 	if err != nil {
@@ -345,7 +543,7 @@ func TestCreatePayloadNilTaskRef(t *testing.T) {
 	}
 
 	ps := p.(in_toto.ProvenanceStatement)
-	if diff := cmp.Diff(tr.Name, ps.Predicate.Invocation.ConfigSource.EntryPoint); diff != "" {
+	if diff := cmp.Diff("", ps.Predicate.Invocation.ConfigSource.EntryPoint); diff != "" {
 		t.Errorf("InTotoIte6.CreatePayload(): -want +got: %s", diff)
 	}
 }
@@ -402,7 +600,9 @@ func TestMultipleSubjects(t *testing.T) {
 		},
 	}
 
-	i, _ := NewFormatter(cfg, logtesting.TestLogger(t))
+	ctx, _ := rtesting.SetupFakeContext(t)
+	ps := fakepipelineclient.Get(ctx)
+	i, _ := NewFormatter(ctx, ps, cfg, logtesting.TestLogger(t))
 	got, err := i.CreatePayload(tr)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err.Error())
@@ -419,7 +619,9 @@ func TestNewFormatter(t *testing.T) {
 				ID: "testid",
 			},
 		}
-		f, err := NewFormatter(cfg, logtesting.TestLogger(t))
+		ctx, _ := rtesting.SetupFakeContext(t)
+		ps := fakepipelineclient.Get(ctx)
+		f, err := NewFormatter(ctx, ps, cfg, logtesting.TestLogger(t))
 		if f == nil {
 			t.Error("Failed to create formatter")
 		}
@@ -435,7 +637,9 @@ func TestCreatePayloadError(t *testing.T) {
 			ID: "testid",
 		},
 	}
-	f, _ := NewFormatter(cfg, logtesting.TestLogger(t))
+	ctx, _ := rtesting.SetupFakeContext(t)
+	ps := fakepipelineclient.Get(ctx)
+	f, _ := NewFormatter(ctx, ps, cfg, logtesting.TestLogger(t))
 
 	t.Run("Invalid type", func(t *testing.T) {
 		p, err := f.CreatePayload("not a task ref")

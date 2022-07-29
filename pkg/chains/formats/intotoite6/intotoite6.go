@@ -17,6 +17,7 @@ limitations under the License.
 package intotoite6
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/tektoncd/chains/pkg/chains/formats"
@@ -24,18 +25,23 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/taskrun"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	"go.uber.org/zap"
 )
 
 type InTotoIte6 struct {
-	builderID string
-	logger    *zap.SugaredLogger
+	builderID         string
+	logger            *zap.SugaredLogger
+	ctx               context.Context
+	pipelineClientSet versioned.Interface
 }
 
-func NewFormatter(cfg config.Config, logger *zap.SugaredLogger) (formats.Payloader, error) {
+func NewFormatter(ctx context.Context, c versioned.Interface, cfg config.Config, logger *zap.SugaredLogger) (formats.Payloader, error) {
 	return &InTotoIte6{
-		builderID: cfg.Builder.ID,
-		logger:    logger,
+		builderID:         cfg.Builder.ID,
+		logger:            logger,
+		ctx:               ctx,
+		pipelineClientSet: c,
 	}, nil
 }
 
@@ -48,7 +54,11 @@ func (i *InTotoIte6) CreatePayload(obj interface{}) (interface{}, error) {
 	case *v1beta1.TaskRun:
 		return taskrun.GenerateAttestation(i.builderID, v, i.logger)
 	case *v1beta1.PipelineRun:
-		return pipelinerun.GenerateAttestation(i.builderID, v, i.logger)
+		att, err := pipelinerun.GenerateAttestation(i.ctx, i.pipelineClientSet, i.builderID, v, i.logger)
+		if err != nil {
+			return nil, err
+		}
+		return att, nil
 	default:
 		return nil, fmt.Errorf("intoto does not support type: %s", v)
 	}

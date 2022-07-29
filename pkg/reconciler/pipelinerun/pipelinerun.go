@@ -22,6 +22,7 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	pipelinerunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/pipelinerun"
+	"github.com/tektoncd/pipeline/pkg/status"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"knative.dev/pkg/controller"
 	"knative.dev/pkg/logging"
@@ -66,10 +67,15 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) 
 		return nil
 	}
 
+	taskRuns, _, err := status.GetFullPipelineTaskStatuses(ctx, r.Pipelineclientset, pr.Namespace, pr)
+	if err != nil {
+		return err
+	}
+
 	// TaskRuns within a PipelineRun may not have been finalized yet if the PipelineRun timeout
 	// has exceeded. Wait to process the PipelineRun on the next update, see
 	// https://github.com/tektoncd/pipeline/issues/4916
-	for name, tr := range pr.Status.TaskRuns {
+	for name, tr := range taskRuns {
 		if tr.Status == nil || tr.Status.CompletionTime == nil {
 			logging.FromContext(ctx).Infof(
 				"taskrun %s within pipelinerun %s/%s is not yet finalized",
@@ -81,7 +87,7 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) 
 	// Signing both taskruns and pipelineruns causes a race condition when using oci storage
 	// during the push to the registry. This checks the taskruns to ensure they've been reconciled
 	// before attempting to sign the pippelinerun
-	for name, _ := range pr.Status.TaskRuns {
+	for name, _ := range taskRuns {
 		reconciled, err := isTaskRunReconciled(ctx, r.Pipelineclientset, pr.Namespace, name)
 		if err != nil {
 			logging.FromContext(ctx).Errorf(

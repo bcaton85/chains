@@ -1,4 +1,7 @@
 {
+    "metadata": {
+        "name": "git-clone"
+    },
     "spec": {
         "params": [],
         "taskRef": {
@@ -8,6 +11,8 @@
         "serviceAccountName": "default"
     },
     "status": {
+        "startTime": "2021-03-29T09:50:00Z",
+        "completionTime": "2021-03-29T09:50:15Z",
         "conditions": [
             {
                 "type": "Succeeded",
@@ -36,6 +41,22 @@
             }
         ],
         "taskSpec": {
+            "steps": [
+                {                        
+                    "env": [
+                    {
+                      "name": "HOME",
+                      "value": "$(params.userHome)"
+                    },
+                    {
+                      "name": "PARAM_URL",
+                      "value": "$(params.url)"
+                    }
+                  ],
+                    "name": "step1",
+                    "script": "git clone"
+                }
+            ],
             "params": [],
             "results": [
                 {

@@ -1,6 +1,7 @@
 package pipelinerun
 
 import (
+	"context"
 	"time"
 
 	intoto "github.com/in-toto/in-toto-golang/in_toto"
@@ -8,7 +9,10 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
+	"github.com/tektoncd/pipeline/pkg/status"
 	"go.uber.org/zap"
+
 	corev1 "k8s.io/api/core/v1"
 	"knative.dev/pkg/apis"
 )
@@ -29,12 +33,13 @@ type TaskAttestation struct {
 	Results    []v1beta1.TaskRunResult   `json:"results,omitempty"`
 }
 
-func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) (interface{}, error) {
-	// We don't need to pass in a client/context here, as we only want access to the original object
-	// Need a better way to differentiate between an abstracted original k8s object and getting the latest values
-	// - Possibly pass client and context in each method call instead of adding it to the struct?
+func GenerateAttestation(ctx context.Context, c versioned.Interface, builderID string, pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) (interface{}, error) {
 	pro := objects.NewPipelineRunObject(pr)
 	subjects := util.GetSubjectDigests(pro, logger)
+	bc, err := buildConfig(ctx, c, pr, logger)
+	if err != nil {
+		return nil, err
+	}
 
 	att := intoto.ProvenanceStatement{
 		StatementHeader: intoto.StatementHeader{
@@ -48,7 +53,7 @@ func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.
 			},
 			BuildType:   util.TektonPipelineRunID,
 			Invocation:  invocation(pr, logger),
-			BuildConfig: buildConfig(pr, logger),
+			BuildConfig: bc,
 			Metadata:    metadata(pr),
 			Materials:   materials(pr),
 		},
@@ -64,41 +69,54 @@ func invocation(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) slsa.Provena
 	return util.AttestInvocation(pr.Spec.Params, paramSpecs, logger)
 }
 
-func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig {
+func buildConfig(ctx context.Context, c versioned.Interface, pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) (BuildConfig, error) {
 	tasks := []TaskAttestation{}
 
-	// pipelineRun.status.taskRuns doesn't maintain order,
-	// so we'll store here and use the order from pipelineRun.status.pipelineSpec.tasks
-	trStatuses := make(map[string]*v1beta1.PipelineRunTaskRunStatus)
-	for _, tr := range pr.Status.TaskRuns {
-		trStatuses[tr.PipelineTaskName] = tr
+	// status.GetFullPipelineTaskStatuses doesn't maintain order,
+	// so we'll store status' separately and reference them later
+
+	// TODO: We're only supporting TaskRun tasks for now. The second parameter
+	// returns a list of Run status', which are an alpha feature. Support can
+	// be added later
+	trStatuses, _, err := status.GetFullPipelineTaskStatuses(ctx, c, pr.Namespace, pr)
+	if err != nil {
+		return BuildConfig{}, err
 	}
 
 	pSpec := pr.Status.PipelineSpec
 	if pSpec == nil {
-		return BuildConfig{}
+		return BuildConfig{}, nil
 	}
 	pipelineTasks := append(pSpec.Tasks, pSpec.Finally...)
 
 	var last string
-	for i, tr := range pipelineTasks {
-		trStatus := trStatuses[tr.Name]
+	for i, t := range pipelineTasks {
+		var trStatus *v1beta1.PipelineRunTaskRunStatus
+		for _, status := range trStatuses {
+			if status.PipelineTaskName == t.Name {
+				trStatus = status
+				break
+			}
+		}
+
+		// Ignore Tasks that did not execute during the PipelineRun.
 		if trStatus == nil || trStatus.Status == nil {
-			// Ignore Tasks that did not execute during the PipelineRun.
+			logger.Infof("status not found for taskrun %s", t.Name)
 			continue
 		}
+
 		steps := []util.StepAttestation{}
 		for i, step := range trStatus.Status.Steps {
 			stepState := trStatus.Status.TaskSpec.Steps[i]
 			steps = append(steps, util.AttestStep(&stepState, &step))
 		}
-		after := tr.RunAfter
+		after := t.RunAfter
 		// tr is a finally task without an explicit runAfter value. It must have executed
 		// after the last non-finally task, if any non-finally tasks were executed.
 		if len(after) == 0 && i >= len(pSpec.Tasks) && last != "" {
 			after = append(after, last)
 		}
-		params := tr.Params
+		params := t.Params
 		var paramSpecs []v1beta1.ParamSpec
 		if trStatus.Status.TaskSpec != nil {
 			paramSpecs = trStatus.Status.TaskSpec.Params
@@ -106,7 +124,7 @@ func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig
 			paramSpecs = []v1beta1.ParamSpec{}
 		}
 		task := TaskAttestation{
-			Name:       trStatus.PipelineTaskName,
+			Name:       t.Name,
 			After:      after,
 			StartedOn:  trStatus.Status.StartTime.Time,
 			FinishedOn: trStatus.Status.CompletionTime.Time,
@@ -116,8 +134,8 @@ func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig
 			Results:    trStatus.Status.TaskRunResults,
 		}
 
-		if tr.TaskRef != nil {
-			task.Ref = *tr.TaskRef
+		if t.TaskRef != nil {
+			task.Ref = *t.TaskRef
 		}
 
 		tasks = append(tasks, task)
@@ -125,7 +143,7 @@ func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig
 			last = task.Name
 		}
 	}
-	return BuildConfig{Tasks: tasks}
+	return BuildConfig{Tasks: tasks}, nil
 }
 
 func metadata(pr *v1beta1.PipelineRun) *slsa.ProvenanceMetadata {

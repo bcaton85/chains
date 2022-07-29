@@ -146,7 +146,7 @@ func TestSigner_Sign(t *testing.T) {
 
 			logger := logging.FromContext(ctx)
 			ts := &ObjectSigner{
-				Formatters:        AllFormatters(*tt.config, logger),
+				Formatters:        AllFormatters(ctx, ps, *tt.config, logger),
 				Backends:          fakeAllBackends(tt.backends),
 				SecretPath:        "./signing/x509/testdata/",
 				Pipelineclientset: ps,
@@ -305,7 +305,7 @@ func TestSigner_Transparency(t *testing.T) {
 
 			logger := logging.FromContext(ctx)
 			os := &ObjectSigner{
-				Formatters:        AllFormatters(*tt.cfg, logger),
+				Formatters:        AllFormatters(ctx, ps, *tt.cfg, logger),
 				Backends:          fakeAllBackends(backends),
 				SecretPath:        "./signing/x509/testdata/",
 				Pipelineclientset: ps,

@@ -21,7 +21,9 @@ import (
 	slsa "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	logtesting "knative.dev/pkg/logging/testing"
+	rtesting "knative.dev/pkg/reconciler/testing"
 )
 
 var pr *v1beta1.PipelineRun
@@ -144,7 +146,12 @@ func TestBuildConfig(t *testing.T) {
 			},
 		},
 	}
-	got := buildConfig(pr, logtesting.TestLogger(t))
+	ctx, _ := rtesting.SetupFakeContext(t)
+	ps := fakepipelineclient.Get(ctx)
+	got, err := buildConfig(ctx, ps, pr, logtesting.TestLogger(t))
+	if err != nil {
+		t.Errorf("error generating buildConfig: %s", err)
+	}
 	if diff := cmp.Diff(expected, got); diff != "" {
 		t.Errorf("buildConfig(): -want +got: %s", diff)
 	}

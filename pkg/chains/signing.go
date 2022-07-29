@@ -82,7 +82,7 @@ func allSigners(ctx context.Context, sp string, cfg config.Config, l *zap.Sugare
 	return all
 }
 
-func AllFormatters(cfg config.Config, l *zap.SugaredLogger) map[formats.PayloadType]formats.Payloader {
+func AllFormatters(ctx context.Context, c versioned.Interface, cfg config.Config, l *zap.SugaredLogger) map[formats.PayloadType]formats.Payloader {
 	all := map[formats.PayloadType]formats.Payloader{}
 
 	for _, f := range formats.AllFormatters {
@@ -100,7 +100,7 @@ func AllFormatters(cfg config.Config, l *zap.SugaredLogger) map[formats.PayloadT
 			}
 			all[f] = formatter
 		case formats.PayloadTypeInTotoIte6:
-			formatter, err := intotoite6.NewFormatter(cfg, l)
+			formatter, err := intotoite6.NewFormatter(ctx, c, cfg, l)
 			if err != nil {
 				l.Warnf("error configuring intoto formatter: %s", err)
 			}
