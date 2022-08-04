@@ -18,6 +18,7 @@ package taskrun
 
 import (
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 )
 
@@ -35,18 +36,18 @@ type Step struct {
 	Annotations map[string]string `json:"annotations"`
 }
 
-func buildConfig(tr *v1beta1.TaskRun) BuildConfig {
+func buildConfig(tro *objects.TaskRunObject) BuildConfig {
 	attestations := []util.StepAttestation{}
-	for _, stepState := range tr.Status.Steps {
-		step := stepFromTaskRun(stepState.Name, tr)
+	for _, stepState := range tro.Status.Steps {
+		step := stepFromTaskRun(stepState.Name, tro)
 		attestations = append(attestations, util.AttestStep(step, &stepState))
 	}
 	return BuildConfig{Steps: attestations}
 }
 
-func stepFromTaskRun(name string, tr *v1beta1.TaskRun) *v1beta1.Step {
-	if tr.Status.TaskSpec != nil {
-		for _, s := range tr.Status.TaskSpec.Steps {
+func stepFromTaskRun(name string, tro *objects.TaskRunObject) *v1beta1.Step {
+	if tro.Status.TaskSpec != nil {
+		for _, s := range tro.Status.TaskSpec.Steps {
 			if s.Name == name {
 				return &s
 			}

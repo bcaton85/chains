@@ -65,7 +65,7 @@ func TestMetadata(t *testing.T) {
 		BuildStartedOn:  &start,
 		BuildFinishedOn: &end,
 	}
-	got := metadata(tr)
+	got := metadata(objects.NewTaskRunObject(tr))
 	if !reflect.DeepEqual(expected, got) {
 		t.Fatalf("expected %v got %v", expected, got)
 	}
@@ -102,7 +102,7 @@ status:
 		},
 	}
 
-	got := materials(taskRun)
+	got := materials(objects.NewTaskRunObject(taskRun))
 	if !reflect.DeepEqual(expected, got) {
 		t.Fatalf("expected %v got %v", expected, got)
 	}
@@ -154,7 +154,7 @@ status:
 		},
 	}
 
-	got := materials(taskRun)
+	got := materials(objects.NewTaskRunObject(taskRun))
 	if !reflect.DeepEqual(expected, got) {
 		t.Fatalf("expected %v got %v", expected, got)
 	}
@@ -182,7 +182,7 @@ spec:
 		},
 	}
 
-	got = materials(taskRun)
+	got = materials(objects.NewTaskRunObject(taskRun))
 	if !reflect.DeepEqual(expected, got) {
 		t.Fatalf("expected %v got %v", expected, got)
 	}
@@ -255,7 +255,7 @@ status:
 		},
 	}
 
-	got := invocation(taskRun, logtesting.TestLogger(t))
+	got := invocation(objects.NewTaskRunObject(taskRun), logtesting.TestLogger(t))
 	if !reflect.DeepEqual(expected, got) {
 		if d := cmp.Diff(expected, got); d != "" {
 			t.Log(d)

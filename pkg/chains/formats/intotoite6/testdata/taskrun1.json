@@ -1,4 +1,7 @@
 {
+    "metadata": {
+        "name": "taskrun-build"
+    },
     "spec": {
         "params": [
             {
@@ -19,7 +22,7 @@
             }
         ],
         "taskRef": {
-            "name": "test-task",
+            "name": "build",
             "kind": "Task"
         },
         "serviceAccountName": "default"
@@ -89,6 +92,17 @@
                 {
                     "name": "BUILDER_IMAGE",
                     "type": "string"
+                }
+            ],
+            "steps": [
+                {
+                    "name": "step1"
+                },
+                {
+                    "name": "step2"
+                },
+                {
+                    "name": "step3"
                 }
             ],
             "results": [

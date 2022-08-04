@@ -20,21 +20,33 @@ import (
 	"github.com/google/go-cmp/cmp"
 	slsa "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	logtesting "knative.dev/pkg/logging/testing"
 )
 
-var pr *v1beta1.PipelineRun
+var pro *objects.PipelineRunObject
 var e1BuildStart = time.Unix(1617011400, 0)
 var e1BuildFinished = time.Unix(1617011415, 0)
 
 // Load file once in the beginning
 func init() {
 	var err error
-	pr, err = util.PipelinerunFromFile("../testdata/pipelinerun1.json")
+	pr, err := util.PipelinerunFromFile("../testdata/pipelinerun1.json")
 	if err != nil {
 		panic(err)
 	}
+	tr1, err := util.TaskrunFromFile("../testdata/taskrun1.json")
+	if err != nil {
+		panic(err)
+	}
+	tr2, err := util.TaskrunFromFile("../testdata/taskrun2.json")
+	if err != nil {
+		panic(err)
+	}
+	pro = objects.NewPipelineRunObject(pr)
+	pro.AppendTaskRun(tr1)
+	pro.AppendTaskRun(tr2)
 }
 
 func TestInvocation(t *testing.T) {
@@ -43,7 +55,7 @@ func TestInvocation(t *testing.T) {
 			"IMAGE": {Type: "string", StringVal: "test.io/test/image"},
 		},
 	}
-	got := invocation(pr, logtesting.TestLogger(t))
+	got := invocation(pro, logtesting.TestLogger(t))
 	if diff := cmp.Diff(expected, got); diff != "" {
 		t.Errorf("invocation(): -want +got: %s", diff)
 	}
@@ -67,8 +79,8 @@ func TestBuildConfig(t *testing.T) {
 						EntryPoint: "git clone",
 						Arguments:  []string(nil),
 						Environment: map[string]interface{}{
-							"container": "clone",
-							"image":     "test.io/test/clone-image",
+							"container": "step1",
+							"image":     "docker-pullable://gcr.io/test1/test1@sha256:d4b63d3e24d6eef04a6dc0795cf8a73470688803d97c52cffa3c8d4efd3397b6",
 						},
 						Annotations: nil,
 					},
@@ -82,17 +94,17 @@ func TestBuildConfig(t *testing.T) {
 				},
 				Results: []v1beta1.TaskRunResult{
 					{
-						Name: "commit",
+						Name: "some-uri_DIGEST",
 						Value: v1beta1.ArrayOrString{
 							Type:      v1beta1.ParamTypeString,
-							StringVal: "abcd",
+							StringVal: "sha256:d4b63d3e24d6eef04a6dc0795cf8a73470688803d97c52cffa3c8d4efd3397b6",
 						},
 					},
 					{
-						Name: "url",
+						Name: "some-uri",
 						Value: v1beta1.ArrayOrString{
 							Type:      v1beta1.ParamTypeString,
-							StringVal: "https://git.test.com",
+							StringVal: "pkg:deb/debian/curl@7.50.3-1",
 						},
 					},
 				},
@@ -109,11 +121,29 @@ func TestBuildConfig(t *testing.T) {
 				Status:     "Succeeded",
 				Steps: []util.StepAttestation{
 					{
-						EntryPoint: "buildah build",
+						EntryPoint: "",
 						Arguments:  []string(nil),
 						Environment: map[string]interface{}{
-							"image":     "test.io/test/build-image",
-							"container": "build",
+							"image":     "docker-pullable://gcr.io/test1/test1@sha256:d4b63d3e24d6eef04a6dc0795cf8a73470688803d97c52cffa3c8d4efd3397b6",
+							"container": "step1",
+						},
+						Annotations: nil,
+					},
+					{
+						EntryPoint: "",
+						Arguments:  []string(nil),
+						Environment: map[string]interface{}{
+							"image":     "docker-pullable://gcr.io/test2/test2@sha256:4d6dd704ef58cb214dd826519929e92a978a57cdee43693006139c0080fd6fac",
+							"container": "step2",
+						},
+						Annotations: nil,
+					},
+					{
+						EntryPoint: "",
+						Arguments:  []string(nil),
+						Environment: map[string]interface{}{
+							"image":     "docker-pullable://gcr.io/test3/test3@sha256:f1a8b8549c179f41e27ff3db0fe1a1793e4b109da46586501a8343637b1d0478",
+							"container": "step3",
 						},
 						Annotations: nil,
 					},
@@ -137,14 +167,14 @@ func TestBuildConfig(t *testing.T) {
 						Name: "IMAGE_URL",
 						Value: v1beta1.ArrayOrString{
 							Type:      v1beta1.ParamTypeString,
-							StringVal: "test.io/test/image\n",
+							StringVal: "gcr.io/my/image",
 						},
 					},
 				},
 			},
 		},
 	}
-	got := buildConfig(pr, logtesting.TestLogger(t))
+	got := buildConfig(pro, logtesting.TestLogger(t))
 	if diff := cmp.Diff(expected, got); diff != "" {
 		t.Errorf("buildConfig(): -want +got: %s", diff)
 	}
@@ -162,7 +192,7 @@ func TestMetadata(t *testing.T) {
 		Reproducible: false,
 	}
 
-	got := metadata(pr)
+	got := metadata(pro)
 	if diff := cmp.Diff(expected, got); diff != "" {
 		t.Errorf("metadata(): -want +got: %s", diff)
 	}
@@ -172,7 +202,7 @@ func TestMaterials(t *testing.T) {
 	expected := []slsa.ProvenanceMaterial{
 		{URI: "git+https://git.test.com.git", Digest: slsa.DigestSet{"sha1": "abcd"}},
 	}
-	got := materials(pr)
+	got := materials(pro)
 	if diff := cmp.Diff(expected, got); diff != "" {
 		t.Errorf("materials(): -want +got: %s", diff)
 	}

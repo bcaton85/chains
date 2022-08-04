@@ -9,6 +9,7 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
+
 	corev1 "k8s.io/api/core/v1"
 	"knative.dev/pkg/apis"
 )
@@ -29,11 +30,7 @@ type TaskAttestation struct {
 	Results    []v1beta1.TaskRunResult   `json:"results,omitempty"`
 }
 
-func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) (interface{}, error) {
-	// We don't need to pass in a client/context here, as we only want access to the original object
-	// Need a better way to differentiate between an abstracted original k8s object and getting the latest values
-	// - Possibly pass client and context in each method call instead of adding it to the struct?
-	pro := objects.NewPipelineRunObject(pr)
+func GenerateAttestation(builderID string, pro *objects.PipelineRunObject, logger *zap.SugaredLogger) (interface{}, error) {
 	subjects := util.GetSubjectDigests(pro, logger)
 
 	att := intoto.ProvenanceStatement{
@@ -47,77 +44,72 @@ func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.
 				ID: builderID,
 			},
 			BuildType:   util.TektonPipelineRunID,
-			Invocation:  invocation(pr, logger),
-			BuildConfig: buildConfig(pr, logger),
-			Metadata:    metadata(pr),
-			Materials:   materials(pr),
+			Invocation:  invocation(pro, logger),
+			BuildConfig: buildConfig(pro, logger),
+			Metadata:    metadata(pro),
+			Materials:   materials(pro),
 		},
 	}
 	return att, nil
 }
 
-func invocation(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) slsa.ProvenanceInvocation {
+func invocation(pro *objects.PipelineRunObject, logger *zap.SugaredLogger) slsa.ProvenanceInvocation {
 	var paramSpecs []v1beta1.ParamSpec
-	if ps := pr.Status.PipelineSpec; ps != nil {
+	if ps := pro.Status.PipelineSpec; ps != nil {
 		paramSpecs = ps.Params
 	}
-	return util.AttestInvocation(pr.Spec.Params, paramSpecs, logger)
+	return util.AttestInvocation(pro.Spec.Params, paramSpecs, logger)
 }
 
-func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig {
+func buildConfig(pro *objects.PipelineRunObject, logger *zap.SugaredLogger) BuildConfig {
 	tasks := []TaskAttestation{}
 
-	// pipelineRun.status.taskRuns doesn't maintain order,
-	// so we'll store here and use the order from pipelineRun.status.pipelineSpec.tasks
-	trStatuses := make(map[string]*v1beta1.PipelineRunTaskRunStatus)
-	for _, tr := range pr.Status.TaskRuns {
-		trStatuses[tr.PipelineTaskName] = tr
-	}
-
-	pSpec := pr.Status.PipelineSpec
+	pSpec := pro.Status.PipelineSpec
 	if pSpec == nil {
 		return BuildConfig{}
 	}
 	pipelineTasks := append(pSpec.Tasks, pSpec.Finally...)
 
 	var last string
-	for i, tr := range pipelineTasks {
-		trStatus := trStatuses[tr.Name]
-		if trStatus == nil || trStatus.Status == nil {
-			// Ignore Tasks that did not execute during the PipelineRun.
+	for i, t := range pipelineTasks {
+		tr := pro.GetTaskRunFromTask(t.Name)
+
+		// Ignore Tasks that did not execute during the PipelineRun.
+		if tr == nil || tr.Status.CompletionTime == nil {
+			logger.Infof("status not found for taskrun %s", t.Name)
 			continue
 		}
 		steps := []util.StepAttestation{}
-		for i, step := range trStatus.Status.Steps {
-			stepState := trStatus.Status.TaskSpec.Steps[i]
+		for i, step := range tr.Status.Steps {
+			stepState := tr.Status.TaskSpec.Steps[i]
 			steps = append(steps, util.AttestStep(&stepState, &step))
 		}
-		after := tr.RunAfter
+		after := t.RunAfter
 		// tr is a finally task without an explicit runAfter value. It must have executed
 		// after the last non-finally task, if any non-finally tasks were executed.
 		if len(after) == 0 && i >= len(pSpec.Tasks) && last != "" {
 			after = append(after, last)
 		}
-		params := tr.Params
+		params := t.Params
 		var paramSpecs []v1beta1.ParamSpec
-		if trStatus.Status.TaskSpec != nil {
-			paramSpecs = trStatus.Status.TaskSpec.Params
+		if tr.Status.TaskSpec != nil {
+			paramSpecs = tr.Status.TaskSpec.Params
 		} else {
 			paramSpecs = []v1beta1.ParamSpec{}
 		}
 		task := TaskAttestation{
-			Name:       trStatus.PipelineTaskName,
+			Name:       t.Name,
 			After:      after,
-			StartedOn:  trStatus.Status.StartTime.Time,
-			FinishedOn: trStatus.Status.CompletionTime.Time,
-			Status:     getStatus(trStatus.Status.Conditions),
+			StartedOn:  tr.Status.StartTime.Time,
+			FinishedOn: tr.Status.CompletionTime.Time,
+			Status:     getStatus(tr.Status.Conditions),
 			Steps:      steps,
 			Invocation: util.AttestInvocation(params, paramSpecs, logger),
-			Results:    trStatus.Status.TaskRunResults,
+			Results:    tr.Status.TaskRunResults,
 		}
 
-		if tr.TaskRef != nil {
-			task.Ref = *tr.TaskRef
+		if t.TaskRef != nil {
+			task.Ref = *t.TaskRef
 		}
 
 		tasks = append(tasks, task)
@@ -128,15 +120,15 @@ func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig
 	return BuildConfig{Tasks: tasks}
 }
 
-func metadata(pr *v1beta1.PipelineRun) *slsa.ProvenanceMetadata {
+func metadata(pro *objects.PipelineRunObject) *slsa.ProvenanceMetadata {
 	m := &slsa.ProvenanceMetadata{}
-	if pr.Status.StartTime != nil {
-		m.BuildStartedOn = &pr.Status.StartTime.Time
+	if pro.Status.StartTime != nil {
+		m.BuildStartedOn = &pro.Status.StartTime.Time
 	}
-	if pr.Status.CompletionTime != nil {
-		m.BuildFinishedOn = &pr.Status.CompletionTime.Time
+	if pro.Status.CompletionTime != nil {
+		m.BuildFinishedOn = &pro.Status.CompletionTime.Time
 	}
-	for label, value := range pr.Labels {
+	for label, value := range pro.Labels {
 		if label == util.ChainsReproducibleAnnotation && value == "true" {
 			m.Reproducible = true
 		}
@@ -145,11 +137,11 @@ func metadata(pr *v1beta1.PipelineRun) *slsa.ProvenanceMetadata {
 }
 
 // add any Git specification to materials
-func materials(pr *v1beta1.PipelineRun) []slsa.ProvenanceMaterial {
+func materials(pro *objects.PipelineRunObject) []slsa.ProvenanceMaterial {
 	var mats []slsa.ProvenanceMaterial
 	var commit, url string
 	// search spec.params
-	for _, p := range pr.Spec.Params {
+	for _, p := range pro.Spec.Params {
 		if p.Name == util.CommitParam {
 			commit = p.Value.StringVal
 			continue
@@ -160,8 +152,8 @@ func materials(pr *v1beta1.PipelineRun) []slsa.ProvenanceMaterial {
 	}
 
 	// search status.PipelineSpec.params
-	if pr.Status.PipelineSpec != nil {
-		for _, p := range pr.Status.PipelineSpec.Params {
+	if pro.Status.PipelineSpec != nil {
+		for _, p := range pro.Status.PipelineSpec.Params {
 			if p.Default == nil {
 				continue
 			}
@@ -176,7 +168,7 @@ func materials(pr *v1beta1.PipelineRun) []slsa.ProvenanceMaterial {
 	}
 
 	// search status.PipelineRunResults
-	for _, r := range pr.Status.PipelineResults {
+	for _, r := range pro.Status.PipelineResults {
 		if r.Name == util.CommitParam {
 			commit = r.Value
 		}

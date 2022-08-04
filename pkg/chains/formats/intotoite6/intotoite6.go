@@ -22,8 +22,8 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/formats"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/pipelinerun"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/taskrun"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
 )
 
@@ -45,9 +45,9 @@ func (i *InTotoIte6) Wrap() bool {
 
 func (i *InTotoIte6) CreatePayload(obj interface{}) (interface{}, error) {
 	switch v := obj.(type) {
-	case *v1beta1.TaskRun:
+	case *objects.TaskRunObject:
 		return taskrun.GenerateAttestation(i.builderID, v, i.logger)
-	case *v1beta1.PipelineRun:
+	case *objects.PipelineRunObject:
 		return pipelinerun.GenerateAttestation(i.builderID, v, i.logger)
 	default:
 		return nil, fmt.Errorf("intoto does not support type: %s", v)

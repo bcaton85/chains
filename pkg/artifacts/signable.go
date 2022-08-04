@@ -43,13 +43,12 @@ type TaskRunArtifact struct {
 }
 
 func (ta *TaskRunArtifact) Key(obj interface{}) string {
-	tr := obj.(*v1beta1.TaskRun)
-	return "taskrun-" + string(tr.UID)
+	tro := obj.(*objects.TaskRunObject)
+	return "taskrun-" + string(tro.UID)
 }
 
 func (ta *TaskRunArtifact) ExtractObjects(obj objects.TektonObject) []interface{} {
-	tr := obj.GetObject().(*v1beta1.TaskRun)
-	return []interface{}{tr}
+	return []interface{}{obj}
 }
 
 func (ta *TaskRunArtifact) Type() string {
@@ -77,13 +76,12 @@ type PipelineRunArtifact struct {
 }
 
 func (pa *PipelineRunArtifact) Key(obj interface{}) string {
-	pr := obj.(*v1beta1.PipelineRun)
-	return "pipelinerun-" + string(pr.UID)
+	pro := obj.(*objects.PipelineRunObject)
+	return "pipelinerun-" + string(pro.UID)
 }
 
 func (pa *PipelineRunArtifact) ExtractObjects(obj objects.TektonObject) []interface{} {
-	pr := obj.GetObject().(*v1beta1.PipelineRun)
-	return []interface{}{pr}
+	return []interface{}{obj}
 }
 
 func (pa *PipelineRunArtifact) Type() string {

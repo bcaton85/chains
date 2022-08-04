@@ -16,6 +16,7 @@ package pipelinerun
 import (
 	"context"
 	"testing"
+	"time"
 
 	signing "github.com/tektoncd/chains/pkg/chains"
 	"github.com/tektoncd/chains/pkg/chains/objects"
@@ -27,6 +28,7 @@ import (
 	fakepipelineruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/pipelinerun/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"knative.dev/pkg/apis"
 	duckv1beta1 "knative.dev/pkg/apis/duck/v1beta1"
@@ -180,6 +182,11 @@ func TestReconciler_handlePipelineRun(t *testing.T) {
 						Name: "taskrun1",
 						Annotations: map[string]string{
 							"chains.tekton.dev/signed": "true",
+						},
+					},
+					Status: v1beta1.TaskRunStatus{
+						TaskRunStatusFields: v1beta1.TaskRunStatusFields{
+							CompletionTime: &v1.Time{Time: time.Date(1995, time.December, 24, 6, 12, 12, 24, time.UTC)},
 						},
 					},
 				},
