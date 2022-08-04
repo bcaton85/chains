@@ -66,9 +66,13 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) 
 		return nil
 	}
 
+	// Get TaskRun names depending on whether embeddedstatus feature is set or not
 	var trs []string
 	if len(pr.Status.ChildReferences) == 0 || len(pr.Status.TaskRuns) > 0 || len(pr.Status.Runs) > 0 {
 		for trName, ptrs := range pr.Status.TaskRuns {
+			// TaskRuns within a PipelineRun may not have been finalized yet if the PipelineRun timeout
+			// has exceeded. Wait to process the PipelineRun on the next update, see
+			// https://github.com/tektoncd/pipeline/issues/4916
 			if ptrs.Status == nil || ptrs.Status.CompletionTime == nil {
 				logging.FromContext(ctx).Infof(
 					"taskrun %s within pipelinerun %s/%s is not yet finalized",
@@ -83,6 +87,9 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) 
 		}
 	}
 
+	// Signing both taskruns and pipelineruns causes a race condition when using oci storage
+	// during the push to the registry. This checks the taskruns to ensure they've been reconciled
+	// before attempting to sign the pippelinerun.
 	for _, name := range trs {
 		tr, err := r.Pipelineclientset.TektonV1beta1().TaskRuns(pr.Namespace).Get(ctx, name, v1.GetOptions{})
 		if err != nil {
@@ -101,7 +108,7 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) 
 			logging.FromContext(ctx).Infof(
 				"taskrun %s within pipelinerun %s/%s is not yet finalized",
 				name, pr.Namespace, pr.Name)
-			return nil
+			return controller.NewRequeueAfter(time.Second * 15)
 		}
 		reconciled := signing.Reconciled(objects.NewTaskRunObject(tr))
 		if !reconciled {
