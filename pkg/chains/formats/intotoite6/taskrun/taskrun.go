@@ -10,8 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func GenerateAttestation(builderID string, tr *v1beta1.TaskRun, logger *zap.SugaredLogger) (interface{}, error) {
-	tro := objects.NewTaskRunObject(tr)
+func GenerateAttestation(builderID string, tro *objects.TaskRunObject, logger *zap.SugaredLogger) (interface{}, error) {
 	subjects := util.GetSubjectDigests(tro, logger)
 
 	att := intoto.ProvenanceStatement{
@@ -25,10 +24,10 @@ func GenerateAttestation(builderID string, tr *v1beta1.TaskRun, logger *zap.Suga
 				ID: builderID,
 			},
 			BuildType:   util.TektonID,
-			Invocation:  invocation(tr, logger),
-			BuildConfig: buildConfig(tr),
-			Metadata:    metadata(tr),
-			Materials:   materials(tr),
+			Invocation:  invocation(tro, logger),
+			BuildConfig: buildConfig(tro),
+			Metadata:    metadata(tro),
+			Materials:   materials(tro),
 		},
 	}
 	return att, nil
@@ -37,23 +36,23 @@ func GenerateAttestation(builderID string, tr *v1beta1.TaskRun, logger *zap.Suga
 // invocation describes the event that kicked off the build
 // we currently don't set ConfigSource because we don't know
 // which material the Task definition came from
-func invocation(tr *v1beta1.TaskRun, logger *zap.SugaredLogger) slsa.ProvenanceInvocation {
+func invocation(tro *objects.TaskRunObject, logger *zap.SugaredLogger) slsa.ProvenanceInvocation {
 	var paramSpecs []v1beta1.ParamSpec
-	if ts := tr.Status.TaskSpec; ts != nil {
+	if ts := tro.Status.TaskSpec; ts != nil {
 		paramSpecs = ts.Params
 	}
-	return util.AttestInvocation(tr.Spec.Params, paramSpecs, logger)
+	return util.AttestInvocation(tro.Spec.Params, paramSpecs, logger)
 }
 
-func metadata(tr *v1beta1.TaskRun) *slsa.ProvenanceMetadata {
+func metadata(tro *objects.TaskRunObject) *slsa.ProvenanceMetadata {
 	m := &slsa.ProvenanceMetadata{}
-	if tr.Status.StartTime != nil {
-		m.BuildStartedOn = &tr.Status.StartTime.Time
+	if tro.Status.StartTime != nil {
+		m.BuildStartedOn = &tro.Status.StartTime.Time
 	}
-	if tr.Status.CompletionTime != nil {
-		m.BuildFinishedOn = &tr.Status.CompletionTime.Time
+	if tro.Status.CompletionTime != nil {
+		m.BuildFinishedOn = &tro.Status.CompletionTime.Time
 	}
-	for label, value := range tr.Labels {
+	for label, value := range tro.Labels {
 		if label == util.ChainsReproducibleAnnotation && value == "true" {
 			m.Reproducible = true
 		}
@@ -62,9 +61,9 @@ func metadata(tr *v1beta1.TaskRun) *slsa.ProvenanceMetadata {
 }
 
 // add any Git specification to materials
-func materials(tr *v1beta1.TaskRun) []slsa.ProvenanceMaterial {
+func materials(tro *objects.TaskRunObject) []slsa.ProvenanceMaterial {
 	var mats []slsa.ProvenanceMaterial
-	gitCommit, gitURL := gitInfo(tr)
+	gitCommit, gitURL := gitInfo(tro)
 
 	// Store git rev as Materials and Recipe.Material
 	if gitCommit != "" && gitURL != "" {
@@ -75,12 +74,12 @@ func materials(tr *v1beta1.TaskRun) []slsa.ProvenanceMaterial {
 		return mats
 	}
 
-	if tr.Spec.Resources == nil {
+	if tro.Spec.Resources == nil {
 		return mats
 	}
 
 	// check for a Git PipelineResource
-	for _, input := range tr.Spec.Resources.Inputs {
+	for _, input := range tro.Spec.Resources.Inputs {
 		if input.ResourceSpec == nil || input.ResourceSpec.Type != v1alpha1.PipelineResourceTypeGit {
 			continue
 		}
@@ -89,7 +88,7 @@ func materials(tr *v1beta1.TaskRun) []slsa.ProvenanceMaterial {
 			Digest: slsa.DigestSet{},
 		}
 
-		for _, rr := range tr.Status.ResourcesResult {
+		for _, rr := range tro.Status.ResourcesResult {
 			if rr.ResourceName != input.Name {
 				continue
 			}
@@ -118,9 +117,9 @@ func materials(tr *v1beta1.TaskRun) []slsa.ProvenanceMaterial {
 
 // gitInfo scans over the input parameters and looks for parameters
 // with specified names.
-func gitInfo(tr *v1beta1.TaskRun) (commit string, url string) {
+func gitInfo(tro *objects.TaskRunObject) (commit string, url string) {
 	// Scan for git params to use for materials
-	for _, p := range tr.Spec.Params {
+	for _, p := range tro.Spec.Params {
 		if p.Name == util.CommitParam {
 			commit = p.Value.StringVal
 			continue
@@ -130,8 +129,8 @@ func gitInfo(tr *v1beta1.TaskRun) (commit string, url string) {
 		}
 	}
 
-	if tr.Status.TaskSpec != nil {
-		for _, p := range tr.Status.TaskSpec.Params {
+	if tro.Status.TaskSpec != nil {
+		for _, p := range tro.Status.TaskSpec.Params {
 			if p.Default == nil {
 				continue
 			}
@@ -145,7 +144,7 @@ func gitInfo(tr *v1beta1.TaskRun) (commit string, url string) {
 		}
 	}
 
-	for _, r := range tr.Status.TaskRunResults {
+	for _, r := range tro.Status.TaskRunResults {
 		if r.Name == util.CommitParam {
 			commit = r.Value.StringVal
 		}

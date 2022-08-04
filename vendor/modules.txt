@@ -1640,6 +1640,7 @@ github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent
 github.com/tektoncd/pipeline/pkg/reconciler/pipeline/dag
 github.com/tektoncd/pipeline/pkg/remote
 github.com/tektoncd/pipeline/pkg/remote/oci
+github.com/tektoncd/pipeline/pkg/status
 github.com/tektoncd/pipeline/pkg/substitution
 github.com/tektoncd/pipeline/test
 # github.com/tektoncd/plumbing v0.0.0-20220329085922-d765a5cba75f

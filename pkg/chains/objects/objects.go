@@ -83,11 +83,12 @@ func (tro *TaskRunObject) GetServiceAccountName() string {
 
 type PipelineRunObject struct {
 	*v1beta1.PipelineRun
+	taskRuns []*v1beta1.TaskRun
 }
 
 func NewPipelineRunObject(pr *v1beta1.PipelineRun) *PipelineRunObject {
 	return &PipelineRunObject{
-		pr,
+		PipelineRun: pr,
 	}
 }
 
@@ -126,4 +127,17 @@ func (pro *PipelineRunObject) GetResults() []Result {
 
 func (pro *PipelineRunObject) GetServiceAccountName() string {
 	return pro.Spec.ServiceAccountName
+}
+
+func (pro *PipelineRunObject) AppendTaskRun(tr *v1beta1.TaskRun) {
+	pro.taskRuns = append(pro.taskRuns, tr)
+}
+
+func (pro *PipelineRunObject) GetTaskRunFromTask(taskName string) *v1beta1.TaskRun {
+	for _, tr := range pro.taskRuns {
+		if tr.Spec.TaskRef.Name == taskName {
+			return tr
+		}
+	}
+	return nil
 }
