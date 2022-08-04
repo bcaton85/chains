@@ -9,7 +9,6 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
-
 	corev1 "k8s.io/api/core/v1"
 	"knative.dev/pkg/apis"
 )
