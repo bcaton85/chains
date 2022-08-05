@@ -1,6 +1,9 @@
 {
     "metadata": {
-        "name": "git-clone"
+        "name": "git-clone",
+        "labels": {
+            "tekton.dev/pipelineTask": "git-clone"
+        }
     },
     "spec": {
         "params": [],
