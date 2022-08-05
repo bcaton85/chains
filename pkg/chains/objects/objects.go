@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+const PipelineTaskLabel = "tekton.dev/pipelineTask"
+
 // Used as a generic Kubernetes object
 // Holds fields common to all objects
 // ref: https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.9.4/pkg/client#Object
@@ -135,7 +137,8 @@ func (pro *PipelineRunObject) AppendTaskRun(tr *v1beta1.TaskRun) {
 
 func (pro *PipelineRunObject) GetTaskRunFromTask(taskName string) *v1beta1.TaskRun {
 	for _, tr := range pro.taskRuns {
-		if tr.Spec.TaskRef.Name == taskName {
+		val, ok := tr.Labels[PipelineTaskLabel]
+		if ok && val == taskName {
 			return tr
 		}
 	}
