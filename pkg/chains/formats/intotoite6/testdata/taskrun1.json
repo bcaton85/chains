@@ -18,10 +18,6 @@
             {
                 "name": "CHAINS-GIT_URL",
                 "value": "https://git.test.com"
-            },
-            {
-                "name": "filename",
-                "value": "/bin/ls"
             }
         ],
         "taskRef": {

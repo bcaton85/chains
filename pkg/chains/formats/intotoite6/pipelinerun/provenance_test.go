@@ -157,8 +157,9 @@ func TestBuildConfig(t *testing.T) {
 				Invocation: slsa.ProvenanceInvocation{
 					ConfigSource: slsa.ConfigSource{},
 					Parameters: map[string]v1beta1.ArrayOrString{
-						"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "$(tasks.git-clone.results.commit)"},
-						"CHAINS-GIT_URL":    {Type: "string", StringVal: "$(tasks.git-clone.results.url)"},
+						"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+						"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+						"IMAGE":             {Type: "string", StringVal: "test.io/test/image"},
 					},
 				},
 				Results: []v1beta1.TaskRunResult{
@@ -190,34 +191,33 @@ func TestBuildConfigTaskOrder(t *testing.T) {
 	BUILD_TASK := 1
 	tests := []struct {
 		name            string
-		expectedParams  map[string]v1beta1.ArrayOrString
+		params          []v1beta1.Param
 		whenExpressions v1beta1.WhenExpressions
 		runAfter        []string
 	}{
 		{
 			name: "Referencing previous task via parameter",
-			expectedParams: map[string]v1beta1.ArrayOrString{
-				"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "$(tasks.git-clone.results.commit)"},
-				"CHAINS-GIT_URL":    {Type: "string", StringVal: "$(tasks.git-clone.results.url)"},
+			params: []v1beta1.Param{
+				{
+					Name:  "CHAINS-GIT_COMMIT",
+					Value: v1beta1.ArrayOrString{Type: "string", StringVal: "$(tasks.git-clone.results.commit)"},
+				},
+				{
+					Name:  "CHAINS-GIT_URL",
+					Value: v1beta1.ArrayOrString{Type: "string", StringVal: "$(tasks.git-clone.results.url)"},
+				},
 			},
 			whenExpressions: nil,
 			runAfter:        []string{},
 		},
 		{
-			name: "Referencing previous task via runAfter",
-			expectedParams: map[string]v1beta1.ArrayOrString{
-				"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
-				"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
-			},
-			whenExpressions: nil,
-			runAfter:        []string{"git-clone"},
+			name:     "Referencing previous task via runAfter",
+			params:   []v1beta1.Param{},
+			runAfter: []string{"git-clone"},
 		},
 		{
-			name: "Referencing previous task via when.Input",
-			expectedParams: map[string]v1beta1.ArrayOrString{
-				"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
-				"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
-			},
+			name:   "Referencing previous task via when.Input",
+			params: []v1beta1.Param{},
 			whenExpressions: v1beta1.WhenExpressions{
 				{
 					Input:    "$(tasks.git-clone.results.commit)",
@@ -228,11 +228,8 @@ func TestBuildConfigTaskOrder(t *testing.T) {
 			runAfter: []string{},
 		},
 		{
-			name: "Referencing previous task via when.Value",
-			expectedParams: map[string]v1beta1.ArrayOrString{
-				"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
-				"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
-			},
+			name:   "Referencing previous task via when.Value",
+			params: []v1beta1.Param{},
 			whenExpressions: v1beta1.WhenExpressions{
 				{
 					Input:    "abcd",
@@ -333,6 +330,11 @@ func TestBuildConfigTaskOrder(t *testing.T) {
 						},
 						Invocation: slsa.ProvenanceInvocation{
 							ConfigSource: slsa.ConfigSource{},
+							Parameters: map[string]v1beta1.ArrayOrString{
+								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+								"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+								"IMAGE":             {Type: "string", StringVal: "test.io/test/image"},
+							},
 						},
 						Results: []v1beta1.TaskRunResult{
 							{
@@ -353,32 +355,18 @@ func TestBuildConfigTaskOrder(t *testing.T) {
 					},
 				},
 			}
-			// New build task is created and added to the pipelinerun for each test
 			pt := v1beta1.PipelineTask{
 				Name: "build",
 				TaskRef: &v1beta1.TaskRef{
 					Kind: "ClusterTask",
 					Name: "build",
 				},
-				Params:          []v1beta1.Param{},
+				Params:          tt.params,
 				WhenExpressions: tt.whenExpressions,
 				RunAfter:        tt.runAfter,
 			}
-
-			// Add the params that are expected to be in the attestation to the
-			// PipelineRun that is being attested
-			for key, val := range tt.expectedParams {
-				pt.Params = append(pt.Params, v1beta1.Param{
-					Name: key,
-					Value: v1beta1.ArrayOrString{
-						Type:      v1beta1.ParamTypeString,
-						StringVal: val.StringVal,
-					},
-				})
-			}
 			pro := createPro()
 			pro.Status.PipelineSpec.Tasks[BUILD_TASK] = pt
-			expected.Tasks[BUILD_TASK].Invocation.Parameters = tt.expectedParams
 			got := buildConfig(pro, logtesting.TestLogger(t))
 			if diff := cmp.Diff(expected, got); diff != "" {
 				t.Errorf("buildConfig(): -want +got: %s", diff)
