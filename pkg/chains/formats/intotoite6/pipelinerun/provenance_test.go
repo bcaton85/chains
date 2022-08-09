@@ -22,15 +22,20 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	"k8s.io/apimachinery/pkg/selection"
 	logtesting "knative.dev/pkg/logging/testing"
 )
 
+// Global pro is only read from, never modified
 var pro *objects.PipelineRunObject
 var e1BuildStart = time.Unix(1617011400, 0)
 var e1BuildFinished = time.Unix(1617011415, 0)
 
-// Load file once in the beginning
 func init() {
+	pro = createPro()
+}
+
+func createPro() *objects.PipelineRunObject {
 	var err error
 	pr, err := util.PipelinerunFromFile("../testdata/pipelinerun1.json")
 	if err != nil {
@@ -44,9 +49,10 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	pro = objects.NewPipelineRunObject(pr)
-	pro.AppendTaskRun(tr1)
-	pro.AppendTaskRun(tr2)
+	p := objects.NewPipelineRunObject(pr)
+	p.AppendTaskRun(tr1)
+	p.AppendTaskRun(tr2)
+	return p
 }
 
 func TestInvocation(t *testing.T) {
@@ -177,6 +183,207 @@ func TestBuildConfig(t *testing.T) {
 	got := buildConfig(pro, logtesting.TestLogger(t))
 	if diff := cmp.Diff(expected, got); diff != "" {
 		t.Errorf("buildConfig(): -want +got: %s", diff)
+	}
+}
+
+func TestBuildConfigTaskOrder(t *testing.T) {
+	BUILD_TASK := 1
+	tests := []struct {
+		name            string
+		expectedParams  map[string]v1beta1.ArrayOrString
+		whenExpressions v1beta1.WhenExpressions
+		runAfter        []string
+	}{
+		{
+			name: "Referencing previous task via parameter",
+			expectedParams: map[string]v1beta1.ArrayOrString{
+				"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "$(tasks.git-clone.results.commit)"},
+				"CHAINS-GIT_URL":    {Type: "string", StringVal: "$(tasks.git-clone.results.url)"},
+			},
+			whenExpressions: nil,
+			runAfter:        []string{},
+		},
+		{
+			name: "Referencing previous task via runAfter",
+			expectedParams: map[string]v1beta1.ArrayOrString{
+				"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+				"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+			},
+			whenExpressions: nil,
+			runAfter:        []string{"git-clone"},
+		},
+		{
+			name: "Referencing previous task via when.Input",
+			expectedParams: map[string]v1beta1.ArrayOrString{
+				"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+				"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+			},
+			whenExpressions: v1beta1.WhenExpressions{
+				{
+					Input:    "$(tasks.git-clone.results.commit)",
+					Operator: selection.Equals,
+					Values:   []string{"abcd"},
+				},
+			},
+			runAfter: []string{},
+		},
+		{
+			name: "Referencing previous task via when.Value",
+			expectedParams: map[string]v1beta1.ArrayOrString{
+				"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+				"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+			},
+			whenExpressions: v1beta1.WhenExpressions{
+				{
+					Input:    "abcd",
+					Operator: selection.Equals,
+					Values:   []string{"$(tasks.git-clone.results.commit)"},
+				},
+			},
+			runAfter: []string{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expected := BuildConfig{
+				Tasks: []TaskAttestation{
+					{
+						Name:  "git-clone",
+						After: nil,
+						Ref: v1beta1.TaskRef{
+							Name: "git-clone",
+							Kind: "ClusterTask",
+						},
+						StartedOn:  e1BuildStart,
+						FinishedOn: e1BuildFinished,
+						Status:     "Succeeded",
+						Steps: []util.StepAttestation{
+							{
+								EntryPoint: "git clone",
+								Arguments:  []string(nil),
+								Environment: map[string]interface{}{
+									"container": "step1",
+									"image":     "docker-pullable://gcr.io/test1/test1@sha256:d4b63d3e24d6eef04a6dc0795cf8a73470688803d97c52cffa3c8d4efd3397b6",
+								},
+								Annotations: nil,
+							},
+						},
+						Invocation: slsa.ProvenanceInvocation{
+							ConfigSource: slsa.ConfigSource{},
+							Parameters: map[string]v1beta1.ArrayOrString{
+								"revision": {Type: "string", StringVal: ""},
+								"url":      {Type: "string", StringVal: "https://git.test.com"},
+							},
+						},
+						Results: []v1beta1.TaskRunResult{
+							{
+								Name: "some-uri_DIGEST",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "sha256:d4b63d3e24d6eef04a6dc0795cf8a73470688803d97c52cffa3c8d4efd3397b6",
+								},
+							},
+							{
+								Name: "some-uri",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "pkg:deb/debian/curl@7.50.3-1",
+								},
+							},
+						},
+					},
+					{
+						Name:  "build",
+						After: []string{"git-clone"},
+						Ref: v1beta1.TaskRef{
+							Name: "build",
+							Kind: "ClusterTask",
+						},
+						StartedOn:  e1BuildStart,
+						FinishedOn: e1BuildFinished,
+						Status:     "Succeeded",
+						Steps: []util.StepAttestation{
+							{
+								EntryPoint: "",
+								Arguments:  []string(nil),
+								Environment: map[string]interface{}{
+									"image":     "docker-pullable://gcr.io/test1/test1@sha256:d4b63d3e24d6eef04a6dc0795cf8a73470688803d97c52cffa3c8d4efd3397b6",
+									"container": "step1",
+								},
+								Annotations: nil,
+							},
+							{
+								EntryPoint: "",
+								Arguments:  []string(nil),
+								Environment: map[string]interface{}{
+									"image":     "docker-pullable://gcr.io/test2/test2@sha256:4d6dd704ef58cb214dd826519929e92a978a57cdee43693006139c0080fd6fac",
+									"container": "step2",
+								},
+								Annotations: nil,
+							},
+							{
+								EntryPoint: "",
+								Arguments:  []string(nil),
+								Environment: map[string]interface{}{
+									"image":     "docker-pullable://gcr.io/test3/test3@sha256:f1a8b8549c179f41e27ff3db0fe1a1793e4b109da46586501a8343637b1d0478",
+									"container": "step3",
+								},
+								Annotations: nil,
+							},
+						},
+						Invocation: slsa.ProvenanceInvocation{
+							ConfigSource: slsa.ConfigSource{},
+						},
+						Results: []v1beta1.TaskRunResult{
+							{
+								Name: "IMAGE_DIGEST",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "sha256:827521c857fdcd4374f4da5442fbae2edb01e7fbae285c3ec15673d4c1daecb7",
+								},
+							},
+							{
+								Name: "IMAGE_URL",
+								Value: v1beta1.ArrayOrString{
+									Type:      v1beta1.ParamTypeString,
+									StringVal: "gcr.io/my/image",
+								},
+							},
+						},
+					},
+				},
+			}
+			// New build task is created and added to the pipelinerun for each test
+			pt := v1beta1.PipelineTask{
+				Name: "build",
+				TaskRef: &v1beta1.TaskRef{
+					Kind: "ClusterTask",
+					Name: "build",
+				},
+				Params:          []v1beta1.Param{},
+				WhenExpressions: tt.whenExpressions,
+				RunAfter:        tt.runAfter,
+			}
+
+			// Add the params that are expected to be in the attestation to the
+			// PipelineRun that is being attested
+			for key, val := range tt.expectedParams {
+				pt.Params = append(pt.Params, v1beta1.Param{
+					Name: key,
+					Value: v1beta1.ArrayOrString{
+						Type:      v1beta1.ParamTypeString,
+						StringVal: val.StringVal,
+					},
+				})
+			}
+			pro := createPro()
+			pro.Status.PipelineSpec.Tasks[BUILD_TASK] = pt
+			expected.Tasks[BUILD_TASK].Invocation.Parameters = tt.expectedParams
+			got := buildConfig(pro, logtesting.TestLogger(t))
+			if diff := cmp.Diff(expected, got); diff != "" {
+				t.Errorf("buildConfig(): -want +got: %s", diff)
+			}
+		})
 	}
 }
 

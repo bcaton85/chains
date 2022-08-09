@@ -101,9 +101,6 @@
                             "value": "$(tasks.git-clone.results.url)"
                         }
                     ],
-                    "runAfter": [
-                        "git-clone"
-                    ],
                     "taskRef": {
                         "kind": "ClusterTask",
                         "name": "build"
