@@ -75,7 +75,7 @@ func buildConfig(pro *objects.PipelineRunObject, logger *zap.SugaredLogger) Buil
 
 		// Ignore Tasks that did not execute during the PipelineRun.
 		if tr == nil || tr.Status.CompletionTime == nil {
-			logger.Infof("status not found for taskrun %s", t.Name)
+			logger.Infof("taskrun status not found for task %s", t.Name)
 			continue
 		}
 		steps := []util.StepAttestation{}
@@ -84,6 +84,24 @@ func buildConfig(pro *objects.PipelineRunObject, logger *zap.SugaredLogger) Buil
 			steps = append(steps, util.AttestStep(&stepState, &step))
 		}
 		after := t.RunAfter
+
+		// Establish task order by retrieving all task's referenced
+		// in the "when" and "params" fields
+		refs := v1beta1.PipelineTaskResultRefs(&t)
+		for _, ref := range refs {
+
+			// Ensure task doesn't already exist in after
+			found := false
+			for _, at := range after {
+				if at == ref.PipelineTask {
+					found = true
+				}
+			}
+			if !found {
+				after = append(after, ref.PipelineTask)
+			}
+		}
+
 		// tr is a finally task without an explicit runAfter value. It must have executed
 		// after the last non-finally task, if any non-finally tasks were executed.
 		if len(after) == 0 && i >= len(pSpec.Tasks) && last != "" {
