@@ -6,7 +6,16 @@
         }
     },
     "spec": {
-        "params": [],
+        "params": [
+            {
+                "name": "url",
+                "value": "https://git.test.com"
+            },
+            {
+                "name": "revision",
+                "value": ""
+            }
+        ],
         "taskRef": {
             "name": "git-clone",
             "kind": "Task"

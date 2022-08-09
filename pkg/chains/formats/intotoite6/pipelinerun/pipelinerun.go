@@ -79,9 +79,9 @@ func buildConfig(pro *objects.PipelineRunObject, logger *zap.SugaredLogger) Buil
 			continue
 		}
 		steps := []util.StepAttestation{}
-		for i, step := range tr.Status.Steps {
-			stepState := tr.Status.TaskSpec.Steps[i]
-			steps = append(steps, util.AttestStep(&stepState, &step))
+		for i, stepState := range tr.Status.Steps {
+			step := tr.Status.TaskSpec.Steps[i]
+			steps = append(steps, util.AttestStep(&step, &stepState))
 		}
 		after := t.RunAfter
 
@@ -107,7 +107,7 @@ func buildConfig(pro *objects.PipelineRunObject, logger *zap.SugaredLogger) Buil
 		if len(after) == 0 && i >= len(pSpec.Tasks) && last != "" {
 			after = append(after, last)
 		}
-		params := t.Params
+		params := tr.Spec.Params
 		var paramSpecs []v1beta1.ParamSpec
 		if tr.Status.TaskSpec != nil {
 			paramSpecs = tr.Status.TaskSpec.Params

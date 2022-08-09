@@ -74,7 +74,6 @@ func TestTaskRunCreatePayload1(t *testing.T) {
 					"IMAGE":             {Type: "string", StringVal: "test.io/test/image"},
 					"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
 					"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
-					"filename":          {Type: "string", StringVal: "/bin/ls"},
 				},
 			},
 			Builder: slsa.ProvenanceBuilder{
@@ -257,8 +256,9 @@ func TestPipelineRunCreatePayload(t *testing.T) {
 						Invocation: slsa.ProvenanceInvocation{
 							ConfigSource: slsa.ConfigSource{},
 							Parameters: map[string]v1beta1.ArrayOrString{
-								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "$(tasks.git-clone.results.commit)"},
-								"CHAINS-GIT_URL":    {Type: "string", StringVal: "$(tasks.git-clone.results.url)"},
+								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+								"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+								"IMAGE":             {Type: "string", StringVal: "test.io/test/image"},
 							},
 						},
 						Results: []v1beta1.TaskRunResult{
@@ -442,8 +442,9 @@ func TestPipelineRunCreatePayloadChildRefs(t *testing.T) {
 						Invocation: slsa.ProvenanceInvocation{
 							ConfigSource: slsa.ConfigSource{},
 							Parameters: map[string]v1beta1.ArrayOrString{
-								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "$(tasks.git-clone.results.commit)"},
-								"CHAINS-GIT_URL":    {Type: "string", StringVal: "$(tasks.git-clone.results.url)"},
+								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+								"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+								"IMAGE":             {Type: "string", StringVal: "test.io/test/image"},
 							},
 						},
 						Results: []v1beta1.TaskRunResult{
@@ -516,7 +517,10 @@ func TestTaskRunCreatePayload2(t *testing.T) {
 				ID: "test_builder-2",
 			},
 			Invocation: slsa.ProvenanceInvocation{
-				Parameters: map[string]v1beta1.ArrayOrString{},
+				Parameters: map[string]v1beta1.ArrayOrString{
+					"revision": {Type: "string"},
+					"url":      {Type: "string", StringVal: "https://git.test.com"},
+				},
 			},
 			BuildType: "https://tekton.dev/attestations/chains@v2",
 			BuildConfig: taskrun.BuildConfig{
