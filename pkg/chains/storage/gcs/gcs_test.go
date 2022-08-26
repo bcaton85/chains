@@ -89,7 +89,7 @@ func TestBackend_StorePayload(t *testing.T) {
 				cfg:    config.Config{Storage: config.StorageConfigs{GCS: config.GCSStorageConfig{Bucket: "foo"}}},
 			}
 			trObj := objects.NewTaskRunObject(tt.args.tr)
-			if err := b.StorePayload(ctx, c, trObj, tt.args.signed, tt.args.signature, tt.args.opts); (err != nil) != tt.wantErr {
+			if err := b.StorePayload(ctx, trObj, tt.args.signed, tt.args.signature, tt.args.opts); (err != nil) != tt.wantErr {
 				t.Errorf("Backend.StorePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
 

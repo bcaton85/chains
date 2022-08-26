@@ -31,7 +31,7 @@ import (
 
 // Backend is an interface to store a chains Payload
 type Backend interface {
-	StorePayload(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error
+	StorePayload(ctx context.Context, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error
 	// RetrievePayloads maps [ref]:[payload] for a TaskRun
 	RetrievePayloads(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error)
 	// RetrieveSignatures maps [ref]:[list of signatures] for a TaskRun

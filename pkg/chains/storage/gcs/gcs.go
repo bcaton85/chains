@@ -62,7 +62,7 @@ func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, cfg confi
 }
 
 // StorePayload implements the storage.Backend interface.
-func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+func (b *Backend) StorePayload(ctx context.Context, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
 	// TODO: Handle unsupported type gracefully
 	tr := obj.GetObject().(*v1beta1.TaskRun)
 	// We need multiple objects: the signature and the payload. We want to make these unique to the UID, but easy to find based on the

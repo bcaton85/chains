@@ -15,6 +15,7 @@ package pipelinerun
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	signing "github.com/tektoncd/chains/pkg/chains"
@@ -45,7 +46,8 @@ var _ pipelinerunreconciler.Finalizer = (*Reconciler)(nil)
 // ReconcileKind  handles a changed or created PipelineRun.
 // This is the main entrypoint for chains business logic.
 func (r *Reconciler) ReconcileKind(ctx context.Context, pr *v1beta1.PipelineRun) pkgreconciler.Event {
-	return r.FinalizeKind(ctx, pr)
+	log := logging.FromContext(ctx).With("pipelinerun", fmt.Sprintf("%s/%s", pr.Namespace, pr.Name))
+	return r.FinalizeKind(logging.WithLogger(ctx, log), pr)
 }
 
 // FinalizeKind implements pipelinerunreconciler.Finalizer
@@ -55,14 +57,14 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, pr *v1beta1.PipelineRun)
 func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) pkgreconciler.Event {
 	// Check to make sure the PipelineRun is finished.
 	if !pr.IsDone() {
-		logging.FromContext(ctx).Infof("pipelinerun %s/%s is still running", pr.Namespace, pr.Name)
+		logging.FromContext(ctx).Infof("pipelinerun is still running")
 		return nil
 	}
 	pro := objects.NewPipelineRunObject(pr)
 
 	// Check to see if it has already been signed.
 	if signing.Reconciled(pro) {
-		logging.FromContext(ctx).Infof("pipelinerun %s/%s has been reconciled", pr.Namespace, pr.Name)
+		logging.FromContext(ctx).Infof("pipelinerun has been reconciled")
 		return nil
 	}
 
@@ -74,9 +76,7 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) 
 			// has exceeded. Wait to process the PipelineRun on the next update, see
 			// https://github.com/tektoncd/pipeline/issues/4916
 			if ptrs.Status == nil || ptrs.Status.CompletionTime == nil {
-				logging.FromContext(ctx).Infof(
-					"taskrun %s within pipelinerun %s/%s is not yet finalized",
-					trName, pr.Namespace, pr.Name)
+				logging.FromContext(ctx).Infof("taskrun %s within pipelinerun is not yet finalized", trName)
 				return nil
 			}
 			trs = append(trs, trName)
@@ -93,27 +93,20 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) 
 	for _, name := range trs {
 		tr, err := r.Pipelineclientset.TektonV1beta1().TaskRuns(pr.Namespace).Get(ctx, name, v1.GetOptions{})
 		if err != nil {
-			logging.FromContext(ctx).Errorf(
-				"Unable to get reconciled status of taskrun %s within pipelinerun %s/%s",
-				name, pr.Namespace, pr.Name)
+			logging.FromContext(ctx).Errorf("Unable to get reconciled status of taskrun %s within pipelinerun", name)
 			return err
 		}
 		if tr == nil {
-			logging.FromContext(ctx).Infof(
-				"taskrun %s within pipelinerun %s/%s is not found",
-				name, pr.Namespace, pr.Name)
+			logging.FromContext(ctx).Infof("taskrun %s within pipelinerun is not found", name)
 			return nil
 		}
 		if tr.Status.CompletionTime == nil {
-			logging.FromContext(ctx).Infof(
-				"taskrun %s within pipelinerun %s/%s is not yet finalized",
-				name, pr.Namespace, pr.Name)
+			logging.FromContext(ctx).Infof("taskrun %s within pipelinerunis not yet finalized", name)
 			return controller.NewRequeueAfter(time.Second * 15)
 		}
 		reconciled := signing.Reconciled(objects.NewTaskRunObject(tr))
 		if !reconciled {
-			logging.FromContext(ctx).Infof("taskrun %s within pipelinerun %s/%s is not yet reconciled",
-				name, pr.Namespace, pr.Name)
+			logging.FromContext(ctx).Infof("taskrun %s within pipelinerun is not yet reconciled", name)
 			return controller.NewRequeueAfter(time.Second * 15)
 		}
 		pro.AppendTaskRun(tr)

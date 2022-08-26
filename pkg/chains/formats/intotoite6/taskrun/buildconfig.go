@@ -17,7 +17,7 @@ limitations under the License.
 package taskrun
 
 import (
-	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/attest"
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 )
@@ -25,7 +25,7 @@ import (
 // BuildConfig is the custom Chains format to fill out the
 // "buildConfig" section of the slsa-provenance predicate
 type BuildConfig struct {
-	Steps []util.StepAttestation `json:"steps"`
+	Steps []attest.StepAttestation `json:"steps"`
 }
 
 // Step corresponds to one step in the TaskRun
@@ -37,10 +37,10 @@ type Step struct {
 }
 
 func buildConfig(tro *objects.TaskRunObject) BuildConfig {
-	attestations := []util.StepAttestation{}
+	attestations := []attest.StepAttestation{}
 	for _, stepState := range tro.Status.Steps {
 		step := stepFromTaskRun(stepState.Name, tro)
-		attestations = append(attestations, util.AttestStep(step, &stepState))
+		attestations = append(attestations, attest.Step(step, &stepState))
 	}
 	return BuildConfig{Steps: attestations}
 }

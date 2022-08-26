@@ -20,7 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
-	"github.com/tektoncd/chains/pkg/test"
+	"github.com/tektoncd/chains/pkg/internal/tekton"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,7 +83,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			ctx, _ := rtesting.SetupFakeContext(t)
 			c := fakepipelineclient.Get(ctx)
 
-			if err := test.CreateTektonObject(ctx, c, tt.object); err != nil {
+			if err := tekton.CreateObject(t, ctx, c, tt.object); err != nil {
 				t.Errorf("error setting up fake taskrun: %v", err)
 			}
 
@@ -97,7 +97,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			}
 			opts := config.StorageOpts{Key: "mockpayload"}
 			mockSignature := "mocksignature"
-			if err := b.StorePayload(ctx, c, tt.object, payload, mockSignature, opts); (err != nil) != tt.wantErr {
+			if err := b.StorePayload(ctx, tt.object, payload, mockSignature, opts); (err != nil) != tt.wantErr {
 				t.Errorf("Backend.StorePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
 

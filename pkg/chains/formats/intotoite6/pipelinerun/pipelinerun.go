@@ -5,12 +5,17 @@ import (
 
 	intoto "github.com/in-toto/in-toto-golang/in_toto"
 	slsa "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
-	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/attest"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/extract"
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"knative.dev/pkg/apis"
+)
+
+const (
+	TektonPipelineRunID = "https://tekton.dev/attestations/chains/pipelinerun@v2"
 )
 
 type BuildConfig struct {
@@ -24,13 +29,13 @@ type TaskAttestation struct {
 	StartedOn  time.Time                 `json:"startedOn,omitempty"`
 	FinishedOn time.Time                 `json:"finishedOn,omitempty"`
 	Status     string                    `json:"status,omitempty"`
-	Steps      []util.StepAttestation    `json:"steps,omitempty"`
+	Steps      []attest.StepAttestation  `json:"steps,omitempty"`
 	Invocation slsa.ProvenanceInvocation `json:"invocation,omitempty"`
 	Results    []v1beta1.TaskRunResult   `json:"results,omitempty"`
 }
 
 func GenerateAttestation(builderID string, pro *objects.PipelineRunObject, logger *zap.SugaredLogger) (interface{}, error) {
-	subjects := util.GetSubjectDigests(pro, logger)
+	subjects := extract.SubjectDigests(pro, logger)
 
 	att := intoto.ProvenanceStatement{
 		StatementHeader: intoto.StatementHeader{
@@ -42,8 +47,8 @@ func GenerateAttestation(builderID string, pro *objects.PipelineRunObject, logge
 			Builder: slsa.ProvenanceBuilder{
 				ID: builderID,
 			},
-			BuildType:   util.TektonPipelineRunID,
-			Invocation:  invocation(pro, logger),
+			BuildType:   TektonPipelineRunID,
+			Invocation:  invocation(pro),
 			BuildConfig: buildConfig(pro, logger),
 			Metadata:    metadata(pro),
 			Materials:   materials(pro),
@@ -52,12 +57,12 @@ func GenerateAttestation(builderID string, pro *objects.PipelineRunObject, logge
 	return att, nil
 }
 
-func invocation(pro *objects.PipelineRunObject, logger *zap.SugaredLogger) slsa.ProvenanceInvocation {
+func invocation(pro *objects.PipelineRunObject) slsa.ProvenanceInvocation {
 	var paramSpecs []v1beta1.ParamSpec
 	if ps := pro.Status.PipelineSpec; ps != nil {
 		paramSpecs = ps.Params
 	}
-	return util.AttestInvocation(pro.Spec.Params, paramSpecs, logger)
+	return attest.Invocation(pro.Spec.Params, paramSpecs)
 }
 
 func buildConfig(pro *objects.PipelineRunObject, logger *zap.SugaredLogger) BuildConfig {
@@ -78,10 +83,10 @@ func buildConfig(pro *objects.PipelineRunObject, logger *zap.SugaredLogger) Buil
 			logger.Infof("taskrun status not found for task %s", t.Name)
 			continue
 		}
-		steps := []util.StepAttestation{}
+		steps := []attest.StepAttestation{}
 		for i, stepState := range tr.Status.Steps {
 			step := tr.Status.TaskSpec.Steps[i]
-			steps = append(steps, util.AttestStep(&step, &stepState))
+			steps = append(steps, attest.Step(&step, &stepState))
 		}
 		after := t.RunAfter
 
@@ -121,7 +126,7 @@ func buildConfig(pro *objects.PipelineRunObject, logger *zap.SugaredLogger) Buil
 			FinishedOn: tr.Status.CompletionTime.Time,
 			Status:     getStatus(tr.Status.Conditions),
 			Steps:      steps,
-			Invocation: util.AttestInvocation(params, paramSpecs, logger),
+			Invocation: attest.Invocation(params, paramSpecs),
 			Results:    tr.Status.TaskRunResults,
 		}
 
@@ -146,7 +151,7 @@ func metadata(pro *objects.PipelineRunObject) *slsa.ProvenanceMetadata {
 		m.BuildFinishedOn = &pro.Status.CompletionTime.Time
 	}
 	for label, value := range pro.Labels {
-		if label == util.ChainsReproducibleAnnotation && value == "true" {
+		if label == attest.ChainsReproducibleAnnotation && value == "true" {
 			m.Reproducible = true
 		}
 	}
@@ -159,11 +164,11 @@ func materials(pro *objects.PipelineRunObject) []slsa.ProvenanceMaterial {
 	var commit, url string
 	// search spec.params
 	for _, p := range pro.Spec.Params {
-		if p.Name == util.CommitParam {
+		if p.Name == attest.CommitParam {
 			commit = p.Value.StringVal
 			continue
 		}
-		if p.Name == util.UrlParam {
+		if p.Name == attest.URLParam {
 			url = p.Value.StringVal
 		}
 	}
@@ -174,11 +179,11 @@ func materials(pro *objects.PipelineRunObject) []slsa.ProvenanceMaterial {
 			if p.Default == nil {
 				continue
 			}
-			if p.Name == util.CommitParam {
+			if p.Name == attest.CommitParam {
 				commit = p.Default.StringVal
 				continue
 			}
-			if p.Name == util.UrlParam {
+			if p.Name == attest.URLParam {
 				url = p.Default.StringVal
 			}
 		}
@@ -186,14 +191,14 @@ func materials(pro *objects.PipelineRunObject) []slsa.ProvenanceMaterial {
 
 	// search status.PipelineRunResults
 	for _, r := range pro.Status.PipelineResults {
-		if r.Name == util.CommitParam {
+		if r.Name == attest.CommitParam {
 			commit = r.Value
 		}
-		if r.Name == util.UrlParam {
+		if r.Name == attest.URLParam {
 			url = r.Value
 		}
 	}
-	url = util.SpdxGit(url, "")
+	url = attest.SPDXGit(url, "")
 	mats = append(mats, slsa.ProvenanceMaterial{
 		URI:    url,
 		Digest: map[string]string{"sha1": commit},

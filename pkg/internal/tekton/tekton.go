@@ -11,11 +11,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package test
+package tekton
 
 import (
 	"context"
 	"fmt"
+	"testing"
 
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
@@ -23,43 +24,44 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreateTektonObject(ctx context.Context, ps pipelineclientset.Interface, obj objects.TektonObject) error {
+func CreateObject(t *testing.T, ctx context.Context, ps pipelineclientset.Interface, obj objects.TektonObject) error {
 	switch o := obj.GetObject().(type) {
 	case *v1beta1.PipelineRun:
 		if _, err := ps.TektonV1beta1().PipelineRuns(obj.GetNamespace()).Create(ctx, o, metav1.CreateOptions{}); err != nil {
-			return err
+			t.Errorf("error creating pipelinerun: %v", err)
 		}
 	case *v1beta1.TaskRun:
 		if _, err := ps.TektonV1beta1().TaskRuns(obj.GetNamespace()).Create(ctx, o, metav1.CreateOptions{}); err != nil {
-			return err
+			t.Errorf("error creating taskrun: %v", err)
 		}
 	}
 	return nil
 }
 
 // Passing in TektonObject since it encapsulates namespace, name, and type.
-func GetTektonObject(ctx context.Context, ps pipelineclientset.Interface, obj objects.TektonObject) (objects.TektonObject, error) {
+func GetObject(t *testing.T, ctx context.Context, ps pipelineclientset.Interface, obj objects.TektonObject) (objects.TektonObject, error) {
 	switch obj.GetObject().(type) {
 	case *v1beta1.PipelineRun:
-		return GetPipelineRun(ctx, ps, obj.GetNamespace(), obj.GetName())
+		return GetPipelineRun(t, ctx, ps, obj.GetNamespace(), obj.GetName())
 	case *v1beta1.TaskRun:
-		return GetTaskRun(ctx, ps, obj.GetNamespace(), obj.GetName())
+		return GetTaskRun(t, ctx, ps, obj.GetNamespace(), obj.GetName())
 	}
+	t.Errorf("unknown object type %T", obj.GetObject())
 	return nil, fmt.Errorf("unknown object type %T", obj.GetObject())
 }
 
-func GetPipelineRun(ctx context.Context, ps pipelineclientset.Interface, namespace, name string) (objects.TektonObject, error) {
+func GetPipelineRun(t *testing.T, ctx context.Context, ps pipelineclientset.Interface, namespace, name string) (objects.TektonObject, error) {
 	pr, err := ps.TektonV1beta1().PipelineRuns(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		t.Errorf("error getting pipelinerun: %v", err)
 	}
 	return objects.NewPipelineRunObject(pr), nil
 }
 
-func GetTaskRun(ctx context.Context, ps pipelineclientset.Interface, namespace, name string) (objects.TektonObject, error) {
+func GetTaskRun(t *testing.T, ctx context.Context, ps pipelineclientset.Interface, namespace, name string) (objects.TektonObject, error) {
 	tr, err := ps.TektonV1beta1().TaskRuns(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		t.Errorf("error getting taskrun: %v", err)
 	}
 	return objects.NewTaskRunObject(tr), nil
 }
