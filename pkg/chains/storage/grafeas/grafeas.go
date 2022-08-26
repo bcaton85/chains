@@ -90,7 +90,7 @@ func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, cfg confi
 }
 
 // StorePayload implements the storage.Backend interface.
-func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+func (b *Backend) StorePayload(ctx context.Context, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
 	// TODO: Gracefully handle unexpected type
 	tr := obj.GetObject().(*v1beta1.TaskRun)
 	// We only support simplesigning for OCI images, and in-toto for taskrun.

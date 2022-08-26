@@ -244,7 +244,7 @@ func TestGrafeasBackend_StoreAndRetrieve(t *testing.T) {
 // test attestation storage and retrieval
 func testStoreAndRetrieve(ctx context.Context, c versioned.Interface, t *testing.T, test testConfig, backend Backend) {
 	trObj := objects.NewTaskRunObject(test.args.tr)
-	if err := backend.StorePayload(ctx, c, trObj, test.args.payload, test.args.signature, test.args.opts); (err != nil) != test.wantErr {
+	if err := backend.StorePayload(ctx, trObj, test.args.payload, test.args.signature, test.args.opts); (err != nil) != test.wantErr {
 		t.Fatalf("Backend.StorePayload() failed. error:%v, wantErr:%v", err, test.wantErr)
 	}
 

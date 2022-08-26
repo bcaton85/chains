@@ -244,11 +244,8 @@ func TestBackend_StorePayload(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal: %v", err)
 			}
-			// TODO: Passing in fake client with the following fails with "Unable to fetch labelkey from context.",
-			// need to diagnose why. Client isn't used so we can get away with passing nil for now.
-			// 	ctx, _ := rtesting.SetupFakeContext(t)
-			// c := fakepipelineclient.Get(ctx)
-			if err := b.StorePayload(ctx, nil, tt.fields.object, rawPayload, tt.args.signature, tt.args.storageOpts); (err != nil) != tt.wantErr {
+
+			if err := b.StorePayload(ctx, tt.fields.object, rawPayload, tt.args.signature, tt.args.storageOpts); (err != nil) != tt.wantErr {
 				t.Errorf("Backend.StorePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

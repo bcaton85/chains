@@ -37,7 +37,6 @@ import (
 	"knative.dev/pkg/logging"
 )
 
-// TODO: Unclear why an interface is defined here.
 type Signer interface {
 	Sign(ctx context.Context, obj objects.TektonObject) error
 }
@@ -130,7 +129,7 @@ func getSignableTypes(obj objects.TektonObject, logger *zap.SugaredLogger) ([]ar
 
 // Signs TaskRun and PipelineRun objects, as well as generates attesations for each
 // Follows process of extract payload, sign payload, store payload and signature
-func (ts *ObjectSigner) Sign(ctx context.Context, tektonObj objects.TektonObject) error {
+func (o *ObjectSigner) Sign(ctx context.Context, tektonObj objects.TektonObject) error {
 	cfg := *config.FromContext(ctx)
 	logger := logging.FromContext(ctx)
 
@@ -139,7 +138,7 @@ func (ts *ObjectSigner) Sign(ctx context.Context, tektonObj objects.TektonObject
 		return err
 	}
 
-	signers := allSigners(ctx, ts.SecretPath, cfg, logger)
+	signers := allSigners(ctx, o.SecretPath, cfg, logger)
 
 	rekorClient, err := getRekor(cfg.Transparency.URL, logger)
 	if err != nil {
@@ -154,7 +153,7 @@ func (ts *ObjectSigner) Sign(ctx context.Context, tektonObj objects.TektonObject
 		}
 		payloadFormat := signableType.PayloadFormat(cfg)
 		// Find the right payload format and format the object
-		payloader, ok := ts.Formatters[payloadFormat]
+		payloader, ok := o.Formatters[payloadFormat]
 
 		if !ok {
 			logger.Warnf("Format %s configured for %s: %v was not found", payloadFormat, tektonObj.GetKind(), signableType.Type())
@@ -207,14 +206,14 @@ func (ts *ObjectSigner) Sign(ctx context.Context, tektonObj objects.TektonObject
 
 			// Now store those!
 			for _, backend := range signableType.StorageBackend(cfg).List() {
-				b := ts.Backends[backend]
+				b := o.Backends[backend]
 				storageOpts := config.StorageOpts{
 					Key:           signableType.Key(obj),
 					Cert:          signer.Cert(),
 					Chain:         signer.Chain(),
 					PayloadFormat: payloadFormat,
 				}
-				if err := b.StorePayload(ctx, ts.Pipelineclientset, tektonObj, rawPayload, string(signature), storageOpts); err != nil {
+				if err := b.StorePayload(ctx, tektonObj, rawPayload, string(signature), storageOpts); err != nil {
 					logger.Error(err)
 					merr = multierror.Append(merr, err)
 				}
@@ -232,7 +231,7 @@ func (ts *ObjectSigner) Sign(ctx context.Context, tektonObj objects.TektonObject
 			}
 		}
 		if merr.ErrorOrNil() != nil {
-			if err := HandleRetry(ctx, tektonObj, ts.Pipelineclientset, extraAnnotations); err != nil {
+			if err := HandleRetry(ctx, tektonObj, o.Pipelineclientset, extraAnnotations); err != nil {
 				merr = multierror.Append(merr, err)
 			}
 			return merr
@@ -240,7 +239,7 @@ func (ts *ObjectSigner) Sign(ctx context.Context, tektonObj objects.TektonObject
 	}
 
 	// Now mark the TaskRun as signed
-	return MarkSigned(ctx, tektonObj, ts.Pipelineclientset, extraAnnotations)
+	return MarkSigned(ctx, tektonObj, o.Pipelineclientset, extraAnnotations)
 }
 
 func HandleRetry(ctx context.Context, obj objects.TektonObject, ps versioned.Interface, annotations map[string]string) error {

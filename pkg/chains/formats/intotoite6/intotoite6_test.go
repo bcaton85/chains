@@ -21,11 +21,12 @@ import (
 	"time"
 
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/attest"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/pipelinerun"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/taskrun"
-	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
+	"github.com/tektoncd/chains/pkg/internal/objectloader"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/in-toto/in-toto-golang/in_toto"
@@ -38,7 +39,7 @@ var e1BuildStart = time.Unix(1617011400, 0)
 var e1BuildFinished = time.Unix(1617011415, 0)
 
 func TestTaskRunCreatePayload1(t *testing.T) {
-	tr, err := util.TaskrunFromFile("testdata/taskrun1.json")
+	tr, err := objectloader.TaskRunFromFile("testdata/taskrun1.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +82,7 @@ func TestTaskRunCreatePayload1(t *testing.T) {
 			},
 			BuildType: "https://tekton.dev/attestations/chains@v2",
 			BuildConfig: taskrun.BuildConfig{
-				Steps: []util.StepAttestation{
+				Steps: []attest.StepAttestation{
 					{
 						Arguments: []string(nil),
 						Environment: map[string]interface{}{
@@ -120,7 +121,7 @@ func TestTaskRunCreatePayload1(t *testing.T) {
 }
 
 func TestPipelineRunCreatePayload(t *testing.T) {
-	pr, err := util.PipelinerunFromFile("testdata/pipelinerun1.json")
+	pr, err := objectloader.PipelineRunFromFile("testdata/pipelinerun1.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +180,7 @@ func TestPipelineRunCreatePayload(t *testing.T) {
 						StartedOn:  e1BuildStart,
 						FinishedOn: e1BuildFinished,
 						Status:     "Succeeded",
-						Steps: []util.StepAttestation{
+						Steps: []attest.StepAttestation{
 							{
 								EntryPoint: "git clone",
 								Arguments:  []string(nil),
@@ -224,7 +225,7 @@ func TestPipelineRunCreatePayload(t *testing.T) {
 						StartedOn:  e1BuildStart,
 						FinishedOn: e1BuildFinished,
 						Status:     "Succeeded",
-						Steps: []util.StepAttestation{
+						Steps: []attest.StepAttestation{
 							{
 								EntryPoint: "",
 								Arguments:  []string(nil),
@@ -283,11 +284,11 @@ func TestPipelineRunCreatePayload(t *testing.T) {
 		},
 	}
 
-	tr1, err := util.TaskrunFromFile("testdata/taskrun1.json")
+	tr1, err := objectloader.TaskRunFromFile("testdata/taskrun1.json")
 	if err != nil {
 		t.Errorf("error reading taskrun1: %s", err.Error())
 	}
-	tr2, err := util.TaskrunFromFile("testdata/taskrun2.json")
+	tr2, err := objectloader.TaskRunFromFile("testdata/taskrun2.json")
 	if err != nil {
 		t.Errorf("error reading taskrun: %s", err.Error())
 	}
@@ -306,7 +307,7 @@ func TestPipelineRunCreatePayload(t *testing.T) {
 	}
 }
 func TestPipelineRunCreatePayloadChildRefs(t *testing.T) {
-	pr, err := util.PipelinerunFromFile("testdata/pipelinerun-childrefs.json")
+	pr, err := objectloader.PipelineRunFromFile("testdata/pipelinerun-childrefs.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +366,7 @@ func TestPipelineRunCreatePayloadChildRefs(t *testing.T) {
 						StartedOn:  e1BuildStart,
 						FinishedOn: e1BuildFinished,
 						Status:     "Succeeded",
-						Steps: []util.StepAttestation{
+						Steps: []attest.StepAttestation{
 							{
 								EntryPoint: "git clone",
 								Arguments:  []string(nil),
@@ -410,7 +411,7 @@ func TestPipelineRunCreatePayloadChildRefs(t *testing.T) {
 						StartedOn:  e1BuildStart,
 						FinishedOn: e1BuildFinished,
 						Status:     "Succeeded",
-						Steps: []util.StepAttestation{
+						Steps: []attest.StepAttestation{
 							{
 								EntryPoint: "",
 								Arguments:  []string(nil),
@@ -469,11 +470,11 @@ func TestPipelineRunCreatePayloadChildRefs(t *testing.T) {
 		},
 	}
 
-	tr1, err := util.TaskrunFromFile("testdata/taskrun1.json")
+	tr1, err := objectloader.TaskRunFromFile("testdata/taskrun1.json")
 	if err != nil {
 		t.Errorf("error reading taskrun1: %s", err.Error())
 	}
-	tr2, err := util.TaskrunFromFile("testdata/taskrun2.json")
+	tr2, err := objectloader.TaskRunFromFile("testdata/taskrun2.json")
 	if err != nil {
 		t.Errorf("error reading taskrun: %s", err.Error())
 	}
@@ -492,7 +493,7 @@ func TestPipelineRunCreatePayloadChildRefs(t *testing.T) {
 }
 
 func TestTaskRunCreatePayload2(t *testing.T) {
-	tr, err := util.TaskrunFromFile("testdata/taskrun2.json")
+	tr, err := objectloader.TaskRunFromFile("testdata/taskrun2.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -524,7 +525,7 @@ func TestTaskRunCreatePayload2(t *testing.T) {
 			},
 			BuildType: "https://tekton.dev/attestations/chains@v2",
 			BuildConfig: taskrun.BuildConfig{
-				Steps: []util.StepAttestation{
+				Steps: []attest.StepAttestation{
 					{
 						EntryPoint: "git clone",
 						Arguments:  []string(nil),
@@ -549,7 +550,7 @@ func TestTaskRunCreatePayload2(t *testing.T) {
 }
 
 func TestCreatePayloadNilTaskRef(t *testing.T) {
-	tr, err := util.TaskrunFromFile("testdata/taskrun1.json")
+	tr, err := objectloader.TaskRunFromFile("testdata/taskrun1.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -574,7 +575,7 @@ func TestCreatePayloadNilTaskRef(t *testing.T) {
 }
 
 func TestMultipleSubjects(t *testing.T) {
-	tr, err := util.TaskrunFromFile("testdata/taskrun-multiple-subjects.json")
+	tr, err := objectloader.TaskRunFromFile("testdata/taskrun-multiple-subjects.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -612,7 +613,7 @@ func TestMultipleSubjects(t *testing.T) {
 				Parameters: map[string]v1beta1.ArrayOrString{},
 			},
 			BuildConfig: taskrun.BuildConfig{
-				Steps: []util.StepAttestation{
+				Steps: []attest.StepAttestation{
 					{
 						Arguments: []string(nil),
 						Environment: map[string]interface{}{

@@ -3,15 +3,20 @@ package taskrun
 import (
 	intoto "github.com/in-toto/in-toto-golang/in_toto"
 	slsa "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
-	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/attest"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/extract"
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
 )
 
+const (
+	TektonID = "https://tekton.dev/attestations/chains@v2"
+)
+
 func GenerateAttestation(builderID string, tro *objects.TaskRunObject, logger *zap.SugaredLogger) (interface{}, error) {
-	subjects := util.GetSubjectDigests(tro, logger)
+	subjects := extract.SubjectDigests(tro, logger)
 
 	att := intoto.ProvenanceStatement{
 		StatementHeader: intoto.StatementHeader{
@@ -23,8 +28,8 @@ func GenerateAttestation(builderID string, tro *objects.TaskRunObject, logger *z
 			Builder: slsa.ProvenanceBuilder{
 				ID: builderID,
 			},
-			BuildType:   util.TektonID,
-			Invocation:  invocation(tro, logger),
+			BuildType:   TektonID,
+			Invocation:  invocation(tro),
 			BuildConfig: buildConfig(tro),
 			Metadata:    metadata(tro),
 			Materials:   materials(tro),
@@ -36,12 +41,12 @@ func GenerateAttestation(builderID string, tro *objects.TaskRunObject, logger *z
 // invocation describes the event that kicked off the build
 // we currently don't set ConfigSource because we don't know
 // which material the Task definition came from
-func invocation(tro *objects.TaskRunObject, logger *zap.SugaredLogger) slsa.ProvenanceInvocation {
+func invocation(tro *objects.TaskRunObject) slsa.ProvenanceInvocation {
 	var paramSpecs []v1beta1.ParamSpec
 	if ts := tro.Status.TaskSpec; ts != nil {
 		paramSpecs = ts.Params
 	}
-	return util.AttestInvocation(tro.Spec.Params, paramSpecs, logger)
+	return attest.Invocation(tro.Spec.Params, paramSpecs)
 }
 
 func metadata(tro *objects.TaskRunObject) *slsa.ProvenanceMetadata {
@@ -53,7 +58,7 @@ func metadata(tro *objects.TaskRunObject) *slsa.ProvenanceMetadata {
 		m.BuildFinishedOn = &tro.Status.CompletionTime.Time
 	}
 	for label, value := range tro.Labels {
-		if label == util.ChainsReproducibleAnnotation && value == "true" {
+		if label == attest.ChainsReproducibleAnnotation && value == "true" {
 			m.Reproducible = true
 		}
 	}
@@ -93,7 +98,7 @@ func materials(tro *objects.TaskRunObject) []slsa.ProvenanceMaterial {
 				continue
 			}
 			if rr.Key == "url" {
-				m.URI = util.SpdxGit(rr.Value, "")
+				m.URI = attest.SPDXGit(rr.Value, "")
 			} else if rr.Key == "commit" {
 				m.Digest["sha1"] = rr.Value
 			}
@@ -109,7 +114,7 @@ func materials(tro *objects.TaskRunObject) []slsa.ProvenanceMaterial {
 				revision = param.Value
 			}
 		}
-		m.URI = util.SpdxGit(url, revision)
+		m.URI = attest.SPDXGit(url, revision)
 		mats = append(mats, m)
 	}
 	return mats
@@ -120,11 +125,11 @@ func materials(tro *objects.TaskRunObject) []slsa.ProvenanceMaterial {
 func gitInfo(tro *objects.TaskRunObject) (commit string, url string) {
 	// Scan for git params to use for materials
 	for _, p := range tro.Spec.Params {
-		if p.Name == util.CommitParam {
+		if p.Name == attest.CommitParam {
 			commit = p.Value.StringVal
 			continue
 		}
-		if p.Name == util.UrlParam {
+		if p.Name == attest.URLParam {
 			url = p.Value.StringVal
 		}
 	}
@@ -134,25 +139,25 @@ func gitInfo(tro *objects.TaskRunObject) (commit string, url string) {
 			if p.Default == nil {
 				continue
 			}
-			if p.Name == util.CommitParam {
+			if p.Name == attest.CommitParam {
 				commit = p.Default.StringVal
 				continue
 			}
-			if p.Name == util.UrlParam {
+			if p.Name == attest.URLParam {
 				url = p.Default.StringVal
 			}
 		}
 	}
 
 	for _, r := range tro.Status.TaskRunResults {
-		if r.Name == util.CommitParam {
+		if r.Name == attest.CommitParam {
 			commit = r.Value.StringVal
 		}
-		if r.Name == util.UrlParam {
+		if r.Name == attest.URLParam {
 			url = r.Value.StringVal
 		}
 	}
 
-	url = util.SpdxGit(url, "")
+	url = attest.SPDXGit(url, "")
 	return
 }

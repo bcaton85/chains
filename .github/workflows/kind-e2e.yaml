@@ -2,9 +2,7 @@ name: Chains kind E2E Tests
 
 on:
   pull_request:
-    branches:
-      - main
-      - poc-tep-84
+    branches: [ main ]
 
 defaults:
   run:

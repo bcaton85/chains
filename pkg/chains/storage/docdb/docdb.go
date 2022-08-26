@@ -63,7 +63,7 @@ func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, cfg confi
 }
 
 // StorePayload implements the Payloader interface.
-func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, _ objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+func (b *Backend) StorePayload(ctx context.Context, _ objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
 	var obj interface{}
 	if err := json.Unmarshal(rawPayload, &obj); err != nil {
 		return err

@@ -52,7 +52,7 @@ func NewStorageBackend(ps versioned.Interface, logger *zap.SugaredLogger) *Backe
 }
 
 // StorePayload implements the Payloader interface.
-func (b *Backend) StorePayload(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+func (b *Backend) StorePayload(ctx context.Context, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
 	b.logger.Infof("Storing payload on %s/%s/%s", obj.GetKind(), obj.GetNamespace(), obj.GetName())
 
 	// Use patch instead of update to prevent race conditions.
@@ -66,9 +66,8 @@ func (b *Backend) StorePayload(ctx context.Context, clientSet versioned.Interfac
 	if err != nil {
 		return err
 	}
-	// if _, err := b.pipelienclientset.TektonV1beta1().TaskRuns(tr.Namespace).Patch(
-	// 	return err
-	patchErr := obj.Patch(ctx, clientSet, patchBytes)
+
+	patchErr := obj.Patch(ctx, b.pipelienclientset, patchBytes)
 	if patchErr != nil {
 		return patchErr
 	}

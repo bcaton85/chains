@@ -24,7 +24,7 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/signing"
 	"github.com/tektoncd/chains/pkg/chains/storage"
 	"github.com/tektoncd/chains/pkg/config"
-	"github.com/tektoncd/chains/pkg/test"
+	"github.com/tektoncd/chains/pkg/internal/tekton"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
@@ -152,7 +152,7 @@ func TestSigner_Sign(t *testing.T) {
 				Pipelineclientset: ps,
 			}
 
-			if err := test.CreateTektonObject(ctx, ps, tt.object); err != nil {
+			if err := tekton.CreateObject(t, ctx, ps, tt.object); err != nil {
 				t.Errorf("error creating fake object: %v", err)
 			}
 			if err := ts.Sign(ctx, tt.object); (err != nil) != tt.wantErr {
@@ -160,7 +160,7 @@ func TestSigner_Sign(t *testing.T) {
 			}
 
 			// Fetch the updated object
-			updatedObject, err := test.GetTektonObject(ctx, ps, tt.object)
+			updatedObject, err := tekton.GetObject(t, ctx, ps, tt.object)
 			if err != nil {
 				t.Errorf("error fetching fake object: %v", err)
 			}
@@ -312,7 +312,7 @@ func TestSigner_Transparency(t *testing.T) {
 			}
 
 			obj := tt.getNewObject("foo")
-			if err := test.CreateTektonObject(ctx, ps, obj); err != nil {
+			if err := tekton.CreateObject(t, ctx, ps, obj); err != nil {
 				t.Errorf("error creating fake object: %v", err)
 			}
 			if err := os.Sign(ctx, obj); err != nil {
@@ -328,7 +328,7 @@ func TestSigner_Transparency(t *testing.T) {
 			ctx = config.ToContext(ctx, tt.cfg.DeepCopy())
 
 			obj = tt.getNewObject("foobar")
-			if err := test.CreateTektonObject(ctx, ps, obj); err != nil {
+			if err := tekton.CreateObject(t, ctx, ps, obj); err != nil {
 				t.Errorf("error creating fake object: %v", err)
 			}
 			if err := os.Sign(ctx, obj); err != nil {
@@ -344,7 +344,7 @@ func TestSigner_Transparency(t *testing.T) {
 			ctx = config.ToContext(ctx, tt.cfg.DeepCopy())
 
 			obj = tt.getNewObject("mytektonobject")
-			if err := test.CreateTektonObject(ctx, ps, obj); err != nil {
+			if err := tekton.CreateObject(t, ctx, ps, obj); err != nil {
 				t.Errorf("error creating fake object: %v", err)
 			}
 			if err := os.Sign(ctx, obj); err != nil {
@@ -405,7 +405,7 @@ type mockBackend struct {
 }
 
 // StorePayload implements the Payloader interface.
-func (b *mockBackend) StorePayload(ctx context.Context, _ versioned.Interface, _ objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+func (b *mockBackend) StorePayload(ctx context.Context, _ objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
 	if b.shouldErr {
 		return errors.New("mock error storing")
 	}

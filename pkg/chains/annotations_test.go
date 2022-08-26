@@ -17,7 +17,7 @@ import (
 	"testing"
 
 	"github.com/tektoncd/chains/pkg/chains/objects"
-	"github.com/tektoncd/chains/pkg/test"
+	"github.com/tektoncd/chains/pkg/internal/tekton"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -119,7 +119,7 @@ func TestMarkSigned(t *testing.T) {
 			ctx, _ := rtesting.SetupFakeContext(t)
 			c := fakepipelineclient.Get(ctx)
 
-			if err := test.CreateTektonObject(ctx, c, tt.object); err != nil {
+			if err := tekton.CreateObject(t, ctx, c, tt.object); err != nil {
 				t.Fatal(err)
 			}
 
@@ -129,7 +129,7 @@ func TestMarkSigned(t *testing.T) {
 			}
 
 			// Now check the signature.
-			signed, err := test.GetTektonObject(ctx, c, tt.object)
+			signed, err := tekton.GetObject(t, ctx, c, tt.object)
 			if err != nil {
 				t.Errorf("Get() error = %v", err)
 			}
@@ -149,7 +149,7 @@ func TestMarkSigned(t *testing.T) {
 			}
 
 			// Now check the signature.
-			signed, err = test.GetTektonObject(ctx, c, tt.object)
+			signed, err = tekton.GetObject(t, ctx, c, tt.object)
 			if err != nil {
 				t.Errorf("Get() error = %v", err)
 			}
@@ -202,7 +202,7 @@ func TestMarkFailed(t *testing.T) {
 			ctx, _ := rtesting.SetupFakeContext(t)
 			// Create a TR for testing
 			c := fakepipelineclient.Get(ctx)
-			if err := test.CreateTektonObject(ctx, c, tt.object); err != nil {
+			if err := tekton.CreateObject(t, ctx, c, tt.object); err != nil {
 				t.Fatal(err)
 			}
 
@@ -211,7 +211,7 @@ func TestMarkFailed(t *testing.T) {
 				t.Errorf("HandleRetry() error = %v", err)
 			}
 
-			failed, err := test.GetTektonObject(ctx, c, tt.object)
+			failed, err := tekton.GetObject(t, ctx, c, tt.object)
 			if err != nil {
 				t.Errorf("Get() error = %v", err)
 			}
@@ -302,7 +302,7 @@ func TestAddRetry(t *testing.T) {
 			ctx, _ := rtesting.SetupFakeContext(t)
 			c := fakepipelineclient.Get(ctx)
 
-			if err := test.CreateTektonObject(ctx, c, tt.object); err != nil {
+			if err := tekton.CreateObject(t, ctx, c, tt.object); err != nil {
 				t.Fatal(err)
 			}
 
@@ -311,7 +311,7 @@ func TestAddRetry(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			signed, err := test.GetTektonObject(ctx, c, tt.object)
+			signed, err := tekton.GetObject(t, ctx, c, tt.object)
 			if err != nil {
 				t.Errorf("Get() error = %v", err)
 			}
@@ -324,7 +324,7 @@ func TestAddRetry(t *testing.T) {
 			if err := AddRetry(ctx, signed, c, nil); err != nil {
 				t.Fatal(err)
 			}
-			signed, err = test.GetTektonObject(ctx, c, tt.object)
+			signed, err = tekton.GetObject(t, ctx, c, tt.object)
 			if err != nil {
 				t.Errorf("Get() error = %v", err)
 			}

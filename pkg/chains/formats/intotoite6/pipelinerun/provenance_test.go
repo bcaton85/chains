@@ -19,8 +19,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	slsa "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
-	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/attest"
 	"github.com/tektoncd/chains/pkg/chains/objects"
+	"github.com/tektoncd/chains/pkg/internal/objectloader"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"k8s.io/apimachinery/pkg/selection"
 	logtesting "knative.dev/pkg/logging/testing"
@@ -37,15 +38,15 @@ func init() {
 
 func createPro() *objects.PipelineRunObject {
 	var err error
-	pr, err := util.PipelinerunFromFile("../testdata/pipelinerun1.json")
+	pr, err := objectloader.PipelineRunFromFile("../testdata/pipelinerun1.json")
 	if err != nil {
 		panic(err)
 	}
-	tr1, err := util.TaskrunFromFile("../testdata/taskrun1.json")
+	tr1, err := objectloader.TaskRunFromFile("../testdata/taskrun1.json")
 	if err != nil {
 		panic(err)
 	}
-	tr2, err := util.TaskrunFromFile("../testdata/taskrun2.json")
+	tr2, err := objectloader.TaskRunFromFile("../testdata/taskrun2.json")
 	if err != nil {
 		panic(err)
 	}
@@ -61,7 +62,7 @@ func TestInvocation(t *testing.T) {
 			"IMAGE": {Type: "string", StringVal: "test.io/test/image"},
 		},
 	}
-	got := invocation(pro, logtesting.TestLogger(t))
+	got := invocation(pro)
 	if diff := cmp.Diff(expected, got); diff != "" {
 		t.Errorf("invocation(): -want +got: %s", diff)
 	}
@@ -80,7 +81,7 @@ func TestBuildConfig(t *testing.T) {
 				StartedOn:  e1BuildStart,
 				FinishedOn: e1BuildFinished,
 				Status:     "Succeeded",
-				Steps: []util.StepAttestation{
+				Steps: []attest.StepAttestation{
 					{
 						EntryPoint: "git clone",
 						Arguments:  []string(nil),
@@ -125,7 +126,7 @@ func TestBuildConfig(t *testing.T) {
 				StartedOn:  e1BuildStart,
 				FinishedOn: e1BuildFinished,
 				Status:     "Succeeded",
-				Steps: []util.StepAttestation{
+				Steps: []attest.StepAttestation{
 					{
 						EntryPoint: "",
 						Arguments:  []string(nil),
@@ -254,7 +255,7 @@ func TestBuildConfigTaskOrder(t *testing.T) {
 						StartedOn:  e1BuildStart,
 						FinishedOn: e1BuildFinished,
 						Status:     "Succeeded",
-						Steps: []util.StepAttestation{
+						Steps: []attest.StepAttestation{
 							{
 								EntryPoint: "git clone",
 								Arguments:  []string(nil),
@@ -299,7 +300,7 @@ func TestBuildConfigTaskOrder(t *testing.T) {
 						StartedOn:  e1BuildStart,
 						FinishedOn: e1BuildFinished,
 						Status:     "Succeeded",
-						Steps: []util.StepAttestation{
+						Steps: []attest.StepAttestation{
 							{
 								EntryPoint: "",
 								Arguments:  []string(nil),
