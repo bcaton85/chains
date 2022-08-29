@@ -1,6 +1,8 @@
 package taskrun
 
 import (
+	"fmt"
+
 	intoto "github.com/in-toto/in-toto-golang/in_toto"
 	slsa "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/attest"
@@ -18,6 +20,8 @@ const (
 func GenerateAttestation(builderID string, tro *objects.TaskRunObject, logger *zap.SugaredLogger) (interface{}, error) {
 	subjects := extract.SubjectDigests(tro, logger)
 
+	tr := tro.GetObject().(*v1beta1.TaskRun)
+
 	att := intoto.ProvenanceStatement{
 		StatementHeader: intoto.StatementHeader{
 			Type:          intoto.StatementInTotoV01,
@@ -28,7 +32,7 @@ func GenerateAttestation(builderID string, tro *objects.TaskRunObject, logger *z
 			Builder: slsa.ProvenanceBuilder{
 				ID: builderID,
 			},
-			BuildType:   TektonID,
+			BuildType:   fmt.Sprintf("%s/%s", tr.GetGroupVersionKind().GroupVersion().String(), tr.GetGroupVersionKind().Kind),
 			Invocation:  invocation(tro),
 			BuildConfig: buildConfig(tro),
 			Metadata:    metadata(tro),
@@ -124,16 +128,6 @@ func materials(tro *objects.TaskRunObject) []slsa.ProvenanceMaterial {
 // with specified names.
 func gitInfo(tro *objects.TaskRunObject) (commit string, url string) {
 	// Scan for git params to use for materials
-	for _, p := range tro.Spec.Params {
-		if p.Name == attest.CommitParam {
-			commit = p.Value.StringVal
-			continue
-		}
-		if p.Name == attest.URLParam {
-			url = p.Value.StringVal
-		}
-	}
-
 	if tro.Status.TaskSpec != nil {
 		for _, p := range tro.Status.TaskSpec.Params {
 			if p.Default == nil {
@@ -146,6 +140,16 @@ func gitInfo(tro *objects.TaskRunObject) (commit string, url string) {
 			if p.Name == attest.URLParam {
 				url = p.Default.StringVal
 			}
+		}
+	}
+
+	for _, p := range tro.Spec.Params {
+		if p.Name == attest.CommitParam {
+			commit = p.Value.StringVal
+			continue
+		}
+		if p.Name == attest.URLParam {
+			url = p.Value.StringVal
 		}
 	}
 

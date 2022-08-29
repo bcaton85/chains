@@ -68,19 +68,19 @@ func TestTaskRunCreatePayload1(t *testing.T) {
 				BuildFinishedOn: &e1BuildFinished,
 			},
 			Materials: []slsa.ProvenanceMaterial{
-				{URI: "git+https://git.test.com.git", Digest: slsa.DigestSet{"sha1": "abcd"}},
+				{URI: "git+https://git.test.com.git", Digest: slsa.DigestSet{"sha1": "sha:taskrun"}},
 			},
 			Invocation: slsa.ProvenanceInvocation{
 				Parameters: map[string]v1beta1.ArrayOrString{
 					"IMAGE":             {Type: "string", StringVal: "test.io/test/image"},
-					"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+					"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "sha:taskrun"},
 					"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
 				},
 			},
 			Builder: slsa.ProvenanceBuilder{
 				ID: "test_builder-1",
 			},
-			BuildType: "https://tekton.dev/attestations/chains@v2",
+			BuildType: "tekton.dev/v1beta1/TaskRun",
 			BuildConfig: taskrun.BuildConfig{
 				Steps: []attest.StepAttestation{
 					{
@@ -194,8 +194,10 @@ func TestPipelineRunCreatePayload(t *testing.T) {
 						Invocation: slsa.ProvenanceInvocation{
 							ConfigSource: slsa.ConfigSource{},
 							Parameters: map[string]v1beta1.ArrayOrString{
-								"revision": {Type: "string", StringVal: ""},
-								"url":      {Type: "string", StringVal: "https://git.test.com"},
+								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "sha:taskdefault"},
+								"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+								"revision":          {Type: "string", StringVal: ""},
+								"url":               {Type: "string", StringVal: "https://git.test.com"},
 							},
 						},
 						Results: []v1beta1.TaskRunResult{
@@ -257,7 +259,7 @@ func TestPipelineRunCreatePayload(t *testing.T) {
 						Invocation: slsa.ProvenanceInvocation{
 							ConfigSource: slsa.ConfigSource{},
 							Parameters: map[string]v1beta1.ArrayOrString{
-								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "sha:taskrun"},
 								"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
 								"IMAGE":             {Type: "string", StringVal: "test.io/test/image"},
 							},
@@ -380,8 +382,10 @@ func TestPipelineRunCreatePayloadChildRefs(t *testing.T) {
 						Invocation: slsa.ProvenanceInvocation{
 							ConfigSource: slsa.ConfigSource{},
 							Parameters: map[string]v1beta1.ArrayOrString{
-								"revision": {Type: "string", StringVal: ""},
-								"url":      {Type: "string", StringVal: "https://git.test.com"},
+								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "sha:taskdefault"},
+								"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+								"revision":          {Type: "string", StringVal: ""},
+								"url":               {Type: "string", StringVal: "https://git.test.com"},
 							},
 						},
 						Results: []v1beta1.TaskRunResult{
@@ -443,7 +447,7 @@ func TestPipelineRunCreatePayloadChildRefs(t *testing.T) {
 						Invocation: slsa.ProvenanceInvocation{
 							ConfigSource: slsa.ConfigSource{},
 							Parameters: map[string]v1beta1.ArrayOrString{
-								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "sha:taskrun"},
 								"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
 								"IMAGE":             {Type: "string", StringVal: "test.io/test/image"},
 							},
@@ -517,13 +521,18 @@ func TestTaskRunCreatePayload2(t *testing.T) {
 			Builder: slsa.ProvenanceBuilder{
 				ID: "test_builder-2",
 			},
+			Materials: []slsa.ProvenanceMaterial{
+				{URI: "git+https://git.test.com.git", Digest: slsa.DigestSet{"sha1": "sha:taskdefault"}},
+			},
 			Invocation: slsa.ProvenanceInvocation{
 				Parameters: map[string]v1beta1.ArrayOrString{
-					"revision": {Type: "string"},
-					"url":      {Type: "string", StringVal: "https://git.test.com"},
+					"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "sha:taskdefault"},
+					"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+					"revision":          {Type: "string"},
+					"url":               {Type: "string", StringVal: "https://git.test.com"},
 				},
 			},
-			BuildType: "https://tekton.dev/attestations/chains@v2",
+			BuildType: "tekton.dev/v1beta1/TaskRun",
 			BuildConfig: taskrun.BuildConfig{
 				Steps: []attest.StepAttestation{
 					{
@@ -604,7 +613,7 @@ func TestMultipleSubjects(t *testing.T) {
 			},
 		},
 		Predicate: slsa.ProvenancePredicate{
-			BuildType: "https://tekton.dev/attestations/chains@v2",
+			BuildType: "tekton.dev/v1beta1/TaskRun",
 			Metadata:  &slsa.ProvenanceMetadata{},
 			Builder: slsa.ProvenanceBuilder{
 				ID: "test_builder-multiple",

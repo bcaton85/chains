@@ -95,8 +95,10 @@ func TestBuildConfig(t *testing.T) {
 				Invocation: slsa.ProvenanceInvocation{
 					ConfigSource: slsa.ConfigSource{},
 					Parameters: map[string]v1beta1.ArrayOrString{
-						"revision": {Type: "string", StringVal: ""},
-						"url":      {Type: "string", StringVal: "https://git.test.com"},
+						"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "sha:taskdefault"},
+						"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+						"revision":          {Type: "string", StringVal: ""},
+						"url":               {Type: "string", StringVal: "https://git.test.com"},
 					},
 				},
 				Results: []v1beta1.TaskRunResult{
@@ -158,7 +160,8 @@ func TestBuildConfig(t *testing.T) {
 				Invocation: slsa.ProvenanceInvocation{
 					ConfigSource: slsa.ConfigSource{},
 					Parameters: map[string]v1beta1.ArrayOrString{
-						"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+						// "CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+						"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "sha:taskrun"},
 						"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
 						"IMAGE":             {Type: "string", StringVal: "test.io/test/image"},
 					},
@@ -269,8 +272,10 @@ func TestBuildConfigTaskOrder(t *testing.T) {
 						Invocation: slsa.ProvenanceInvocation{
 							ConfigSource: slsa.ConfigSource{},
 							Parameters: map[string]v1beta1.ArrayOrString{
-								"revision": {Type: "string", StringVal: ""},
-								"url":      {Type: "string", StringVal: "https://git.test.com"},
+								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "sha:taskdefault"},
+								"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
+								"url":               {Type: "string", StringVal: "https://git.test.com"},
+								"revision":          {Type: "string", StringVal: ""},
 							},
 						},
 						Results: []v1beta1.TaskRunResult{
@@ -332,7 +337,9 @@ func TestBuildConfigTaskOrder(t *testing.T) {
 						Invocation: slsa.ProvenanceInvocation{
 							ConfigSource: slsa.ConfigSource{},
 							Parameters: map[string]v1beta1.ArrayOrString{
-								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+								// TODO: Is this right?
+								// "CHAINS-GIT_COMMIT": {Type: "string", StringVal: "abcd"},
+								"CHAINS-GIT_COMMIT": {Type: "string", StringVal: "sha:taskrun"},
 								"CHAINS-GIT_URL":    {Type: "string", StringVal: "https://git.test.com"},
 								"IMAGE":             {Type: "string", StringVal: "test.io/test/image"},
 							},

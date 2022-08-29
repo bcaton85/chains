@@ -57,7 +57,16 @@ type ObjectSigner struct {
 
 func allSigners(ctx context.Context, sp string, cfg config.Config, l *zap.SugaredLogger) map[string]signing.Signer {
 	all := map[string]signing.Signer{}
+	neededSigners := map[string]struct{}{
+		cfg.Artifacts.OCI.Signer:          {},
+		cfg.Artifacts.TaskRuns.Signer:     {},
+		cfg.Artifacts.PipelineRuns.Signer: {},
+	}
+
 	for _, s := range signing.AllSigners {
+		if _, ok := neededSigners[s]; !ok {
+			continue
+		}
 		switch s {
 		case signing.TypeX509:
 			signer, err := x509.NewSigner(ctx, sp, cfg, l)
