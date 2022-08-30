@@ -79,12 +79,12 @@ func (b *Backend) Type() string {
 }
 
 // retrieveAnnotationValue retrieve the value of an annotation and base64 decode it if needed.
-func (b *Backend) retrieveAnnotationValue(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, annotationKey string, decode bool) (string, error) {
+func (b *Backend) retrieveAnnotationValue(ctx context.Context, obj objects.TektonObject, annotationKey string, decode bool) (string, error) {
 	// Retrieve the TaskRun.
 	b.logger.Infof("Retrieving annotation %q on %s/%s/%s", annotationKey, obj.GetKind(), obj.GetNamespace(), obj.GetName())
 
 	var annotationValue string
-	annotations, err := obj.GetLatestAnnotations(ctx, clientSet)
+	annotations, err := obj.GetLatestAnnotations(ctx, b.pipelienclientset)
 	if err != nil {
 		return "", fmt.Errorf("error retrieving the annotation value for the key %q: %s", annotationKey, err)
 	}
@@ -108,10 +108,10 @@ func (b *Backend) retrieveAnnotationValue(ctx context.Context, clientSet version
 }
 
 // RetrieveSignature retrieve the signature stored in the taskrun.
-func (b *Backend) RetrieveSignatures(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
+func (b *Backend) RetrieveSignatures(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
 	b.logger.Infof("Retrieving signature on %s/%s/%s", obj.GetKind(), obj.GetNamespace(), obj.GetName())
 	signatureAnnotation := sigName(opts)
-	signature, err := b.retrieveAnnotationValue(ctx, clientSet, obj, signatureAnnotation, true)
+	signature, err := b.retrieveAnnotationValue(ctx, obj, signatureAnnotation, true)
 	if err != nil {
 		return nil, err
 	}
@@ -134,10 +134,10 @@ func (b *Backend) RetrieveSignatures(ctx context.Context, clientSet versioned.In
 }
 
 // RetrievePayload retrieve the payload stored in the taskrun.
-func (b *Backend) RetrievePayloads(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
+func (b *Backend) RetrievePayloads(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
 	b.logger.Infof("Retrieving payload on %s/%s/%s", obj.GetKind(), obj.GetNamespace(), obj.GetName())
 	payloadAnnotation := payloadName(opts)
-	payload, err := b.retrieveAnnotationValue(ctx, clientSet, obj, payloadAnnotation, true)
+	payload, err := b.retrieveAnnotationValue(ctx, obj, payloadAnnotation, true)
 	if err != nil {
 		return nil, err
 	}

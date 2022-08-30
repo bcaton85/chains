@@ -31,7 +31,6 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -130,7 +129,7 @@ func (b *Backend) StorePayload(ctx context.Context, obj objects.TektonObject, ra
 }
 
 // Retrieve payloads from grafeas server and store it in a map
-func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
+func (b *Backend) RetrievePayloads(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
 	// TODO: Gracefully handle unexpected type
 	tr := obj.GetObject().(*v1beta1.TaskRun)
 	// initialize an empty map for result
@@ -156,7 +155,7 @@ func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, o
 }
 
 // Retrieve signatures from grafeas server and store it in a map
-func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
+func (b *Backend) RetrieveSignatures(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
 	// TODO: Gracefully handle unexpected type
 	tr := obj.GetObject().(*v1beta1.TaskRun)
 	// initialize an empty map for result

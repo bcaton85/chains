@@ -27,7 +27,6 @@ import (
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/chains/pkg/internal/tekton"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -495,10 +494,10 @@ func (b *mockBackend) Type() string {
 	return b.backendType
 }
 
-func (b *mockBackend) RetrievePayloads(ctx context.Context, _ versioned.Interface, _ objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
+func (b *mockBackend) RetrievePayloads(ctx context.Context, _ objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (b *mockBackend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, _ objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
+func (b *mockBackend) RetrieveSignatures(ctx context.Context, _ objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
 	return nil, fmt.Errorf("not implemented")
 }

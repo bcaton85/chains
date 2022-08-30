@@ -33,9 +33,9 @@ import (
 type Backend interface {
 	StorePayload(ctx context.Context, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error
 	// RetrievePayloads maps [ref]:[payload] for a TaskRun
-	RetrievePayloads(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error)
+	RetrievePayloads(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error)
 	// RetrieveSignatures maps [ref]:[list of signatures] for a TaskRun
-	RetrieveSignatures(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error)
+	RetrieveSignatures(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error)
 	// Type is the string representation of the backend
 	Type() string
 }

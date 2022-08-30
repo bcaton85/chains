@@ -107,7 +107,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			}
 
 			payloadAnnotation := payloadName(opts)
-			payloads, err := b.RetrievePayloads(ctx, c, tt.object, opts)
+			payloads, err := b.RetrievePayloads(ctx, tt.object, opts)
 			if err != nil {
 				t.Errorf("error base64 decoding: %v", err)
 			}
@@ -124,7 +124,7 @@ func TestBackend_StorePayload(t *testing.T) {
 
 			// Compare the signature.
 			signatureAnnotation := sigName(opts)
-			sigs, err := b.RetrieveSignatures(ctx, c, tt.object, opts)
+			sigs, err := b.RetrieveSignatures(ctx, tt.object, opts)
 			if err != nil {
 				t.Fatal(err)
 			}

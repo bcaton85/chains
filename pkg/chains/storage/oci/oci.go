@@ -21,7 +21,6 @@ import (
 
 	"github.com/tektoncd/chains/pkg/chains/formats"
 	"github.com/tektoncd/chains/pkg/chains/objects"
-	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -208,7 +207,7 @@ func (b *Backend) Type() string {
 	return StorageBackendOCI
 }
 
-func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
+func (b *Backend) RetrieveSignatures(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
 	images, err := b.RetrieveArtifact(ctx, obj, opts)
 	if err != nil {
 		return nil, err
@@ -236,7 +235,7 @@ func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface,
 	return m, nil
 }
 
-func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
+func (b *Backend) RetrievePayloads(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
 	var err error
 	images, err := b.RetrieveArtifact(ctx, obj, opts)
 	if err != nil {

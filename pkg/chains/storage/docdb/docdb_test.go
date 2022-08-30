@@ -20,7 +20,6 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	"gocloud.dev/docstore"
 	_ "gocloud.dev/docstore/memdocstore"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +30,6 @@ import (
 
 func TestBackend_StorePayload(t *testing.T) {
 	ctx, _ := rtesting.SetupFakeContext(t)
-	c := fakepipelineclient.Get(ctx)
-
 	type args struct {
 		tr         *v1beta1.TaskRun
 		rawPayload interface{}
@@ -94,7 +91,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			}
 
 			// Check the signature.
-			signatures, err := b.RetrieveSignatures(ctx, c, trObj, opts)
+			signatures, err := b.RetrieveSignatures(ctx, trObj, opts)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -107,7 +104,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			}
 
 			// Check the payload.
-			payloads, err := b.RetrievePayloads(ctx, c, trObj, opts)
+			payloads, err := b.RetrievePayloads(ctx, trObj, opts)
 			if err != nil {
 				t.Fatal(err)
 			}

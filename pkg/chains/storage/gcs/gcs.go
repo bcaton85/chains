@@ -24,7 +24,6 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	"go.uber.org/zap"
 )
 
@@ -145,7 +144,7 @@ func (r *reader) GetReader(ctx context.Context, object string) (io.ReadCloser, e
 	return r.client.Bucket(r.bucket).Object(object).NewReader(ctx)
 }
 
-func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
+func (b *Backend) RetrieveSignatures(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
 	// TODO: Handle unsupported type gracefully
 	tr := obj.GetObject().(*v1beta1.TaskRun)
 	object := sigName(tr, opts)
@@ -159,7 +158,7 @@ func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface,
 	return m, nil
 }
 
-func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
+func (b *Backend) RetrievePayloads(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
 	// TODO: Handle unsupported type gracefully
 	tr := obj.GetObject().(*v1beta1.TaskRun)
 	object := payloadName(tr, opts)

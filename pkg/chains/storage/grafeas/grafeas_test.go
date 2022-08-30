@@ -32,8 +32,6 @@ import (
 	pb "github.com/grafeas/grafeas/proto/v1/grafeas_go_proto"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
-	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	gstatus "google.golang.org/grpc/status"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -202,7 +200,6 @@ func TestGrafeasBackend_StoreAndRetrieve(t *testing.T) {
 	}
 
 	ctx, _ := rtesting.SetupFakeContext(t)
-	c := fakepipelineclient.Get(ctx)
 	conn, client, err := setupConnection()
 	if err != nil {
 		t.Fatal("Failed to create grafeas client.")
@@ -226,7 +223,7 @@ func TestGrafeasBackend_StoreAndRetrieve(t *testing.T) {
 			}
 			// test if the attestation of the taskrun/oci artifact can be successfully stored into grafeas server
 			// and test if payloads and signatures inside the attestation can be retrieved.
-			testStoreAndRetrieve(ctx, c, t, test, backend)
+			testStoreAndRetrieve(ctx, t, test, backend)
 		})
 	}
 
@@ -244,7 +241,7 @@ func TestGrafeasBackend_StoreAndRetrieve(t *testing.T) {
 }
 
 // test attestation storage and retrieval
-func testStoreAndRetrieve(ctx context.Context, c versioned.Interface, t *testing.T, test testConfig, backend Backend) {
+func testStoreAndRetrieve(ctx context.Context, t *testing.T, test testConfig, backend Backend) {
 	trObj := objects.NewTaskRunObject(test.args.tr)
 	if err := backend.StorePayload(ctx, trObj, test.args.payload, test.args.signature, test.args.opts); (err != nil) != test.wantErr {
 		t.Fatalf("Backend.StorePayload() failed. error:%v, wantErr:%v", err, test.wantErr)
@@ -264,7 +261,7 @@ func testStoreAndRetrieve(ctx context.Context, c versioned.Interface, t *testing
 		}
 	}
 
-	gotSignature, err := backend.RetrieveSignatures(ctx, c, trObj, test.args.opts)
+	gotSignature, err := backend.RetrieveSignatures(ctx, trObj, test.args.opts)
 	if err != nil {
 		t.Fatal("Backend.RetrieveSignatures() failed: ", err)
 	}
@@ -287,7 +284,7 @@ func testStoreAndRetrieve(ctx context.Context, c versioned.Interface, t *testing
 		}
 	}
 
-	gotPayload, err := backend.RetrievePayloads(ctx, c, trObj, test.args.opts)
+	gotPayload, err := backend.RetrievePayloads(ctx, trObj, test.args.opts)
 	if err != nil {
 		t.Fatal("RetrievePayloads.RetrievePayloads() failed: ", err)
 	}
