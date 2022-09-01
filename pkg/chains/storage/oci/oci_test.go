@@ -40,8 +40,7 @@ import (
 )
 
 const (
-	namespace      = "oci-test"
-	serviceAccount = "oci-test-sa"
+	namespace = "oci-test"
 )
 
 var (

@@ -88,7 +88,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			}
 
 			b := &Backend{
-				pipelienclientset: c,
+				pipelineclientset: c,
 				logger:            logtesting.TestLogger(t),
 			}
 			payload, err := json.Marshal(tt.payload)
