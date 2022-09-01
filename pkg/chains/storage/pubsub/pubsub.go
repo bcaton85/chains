@@ -20,7 +20,6 @@ import (
 
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
 	"gocloud.dev/pubsub/kafkapubsub"
 
@@ -54,9 +53,7 @@ func (b *Backend) Type() string {
 }
 
 func (b *Backend) StorePayload(ctx context.Context, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
-	// TODO: Handle unsupported type gracefully
-	tr := obj.GetObject().(*v1beta1.TaskRun)
-	b.logger.Infof("Storing payload on TaskRun %s/%s", tr.Namespace, tr.Name)
+	b.logger.Infof("Storing payload on Object %s/%s", obj.GetNamespace(), obj.GetName())
 
 	// Construct a *pubsub.Topic.
 	topic, err := b.NewTopic()
