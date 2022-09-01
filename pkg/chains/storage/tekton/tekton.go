@@ -16,14 +16,12 @@ package tekton
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 
 	"github.com/tektoncd/chains/pkg/patch"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	"go.uber.org/zap"
 )
@@ -115,19 +113,6 @@ func (b *Backend) RetrieveSignatures(ctx context.Context, obj objects.TektonObje
 	if err != nil {
 		return nil, err
 	}
-
-	// Check if we have a pipelinerun object, if so just return the signature
-	if _, ok := obj.GetObject().(*v1beta1.PipelineRun); ok {
-		return map[string][]string{
-			signatureAnnotation: {signature},
-		}, nil
-	}
-
-	// We must have a taskrun object, so check for the IMAGE_URL param before adding signature
-	if _, ok := obj.GetObject().(*v1beta1.TaskRun); !ok {
-		return nil, errors.New("unrecognized object type for retrieving signatures")
-	}
-
 	m := make(map[string][]string)
 	m[signatureAnnotation] = []string{signature}
 	return m, nil
@@ -141,19 +126,6 @@ func (b *Backend) RetrievePayloads(ctx context.Context, obj objects.TektonObject
 	if err != nil {
 		return nil, err
 	}
-
-	// Check if we have a pipelinerun object, if so just return the signature
-	if _, ok := obj.GetObject().(*v1beta1.PipelineRun); ok {
-		return map[string]string{
-			payloadAnnotation: payload,
-		}, nil
-	}
-
-	// We must have a taskrun object, so check for the IMAGE_URL param before adding signature
-	if _, ok := obj.GetObject().(*v1beta1.TaskRun); !ok {
-		return nil, errors.New("unrecognized object type for retrieving payload")
-	}
-
 	m := make(map[string]string)
 	m[payloadAnnotation] = payload
 	return m, nil

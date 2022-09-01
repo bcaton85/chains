@@ -71,7 +71,6 @@ func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, client ku
 
 // StorePayload implements the storage.Backend interface.
 func (b *Backend) StorePayload(ctx context.Context, obj objects.TektonObject, rawPayload []byte, signature string, storageOpts config.StorageOpts) error {
-	// TODO: Handle unexpected type gracefully
 	auth, err := b.getAuthenticator(ctx, obj, b.client)
 	if err != nil {
 		return err
