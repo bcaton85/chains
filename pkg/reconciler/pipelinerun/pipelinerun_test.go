@@ -22,7 +22,7 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/chains/pkg/internal/mocksigner"
-	"github.com/tektoncd/chains/pkg/internal/tekton"
+	"github.com/tektoncd/chains/pkg/test/tekton"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	informers "github.com/tektoncd/pipeline/pkg/client/informers/externalversions/pipeline/v1beta1"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
@@ -243,10 +243,7 @@ func TestReconciler_handlePipelineRun(t *testing.T) {
 
 			// Create mock taskruns
 			for _, tr := range tt.taskruns {
-				err := tekton.CreateObject(t, ctx, r.Pipelineclientset, objects.NewTaskRunObject(tr))
-				if err != nil {
-					t.Errorf("Unable to create mock taskrun: %s", tr.Name)
-				}
+				tekton.CreateObject(t, ctx, r.Pipelineclientset, objects.NewTaskRunObject(tr))
 			}
 
 			if err := r.ReconcileKind(ctx, tt.pr); err != nil && !tt.wantErr {
