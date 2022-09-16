@@ -152,7 +152,7 @@ func (pro *PipelineRunObject) GetResults() []Result {
 			Name: key.Name,
 			Value: v1beta1.ArrayOrString{
 				Type:      v1beta1.ParamTypeString,
-				StringVal: key.Value,
+				StringVal: key.Value.StringVal,
 			},
 		})
 	}
