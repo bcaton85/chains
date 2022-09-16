@@ -205,10 +205,10 @@ func materials(pro *objects.PipelineRunObject) []slsa.ProvenanceMaterial {
 	// search status.PipelineRunResults
 	for _, r := range pro.Status.PipelineResults {
 		if r.Name == attest.CommitParam {
-			commit = r.Value
+			commit = r.Value.StringVal
 		}
 		if r.Name == attest.URLParam {
-			url = r.Value
+			url = r.Value.StringVal
 		}
 	}
 	url = attest.SPDXGit(url, "")
